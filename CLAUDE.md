@@ -70,6 +70,8 @@ Test class behaviour, never the container wiring.
 Standard Rosetta workflow (see the workspace root `CLAUDE.md`): branch from an up-to-date `main`
 (`f/` features, `b/` bugs), Conventional Commits (ticket as scope when the branch has one), open a PR
 with `gh pr create --fill`, then run the Copilot and PR-checks review cycles.
+**Do not commit on `main`** unless a human explicitly authorizes a documented exception (foundation
+bootstrap or emergency hotfix). Husky enforces Conventional Commits on every commit.
 
 ## Code Style
 

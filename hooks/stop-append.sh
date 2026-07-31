@@ -27,11 +27,20 @@
 
 set -euo pipefail
 
+# Shared env written by team-setup (Claude + Cursor). Optional if vars already set.
+ENV_FILE="${ROSETTA_CHRONICLE_ENV:-$HOME/.config/rosetta/chronicle.env}"
+if [[ -f "$ENV_FILE" ]]; then
+  # shellcheck disable=SC1090
+  set -a
+  source "$ENV_FILE"
+  set +a
+fi
+
 LOG_DIR="${CHRONICLE_REPO:-$HOME/chronicle-logs}"
 LOG_FILE="$LOG_DIR/stop-hook.log"
 mkdir -p "$(dirname "$LOG_FILE")"
 
-# Read stdin payload (passed by Claude Code).
+# Read stdin payload (passed by Claude Code or the Cursor adapter).
 HOOK_PAYLOAD=$(cat)
 
 # Nothing to do if CHRONICLE_REPO is not set.
