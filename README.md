@@ -38,9 +38,9 @@ manual notes. See [`docs/mvp.md`](docs/mvp.md) for the input/output spec.
 ## Development
 
 ```bash
-yarn install
-yarn build      # tsc
-yarn test       # jest
+bun install
+bun run build   # tsc (TypeScript 7, native)
+bun run test    # jest (@swc/jest transform; type-checking happens in build)
 ```
 
 ### Architecture

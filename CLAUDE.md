@@ -54,9 +54,9 @@ same pattern.
 ## Build & Test
 
 ```bash
-yarn install
-yarn build      # tsc
-yarn test       # jest
+bun install
+bun run build   # tsc (TypeScript 7, native)
+bun run test    # jest (@swc/jest transform; type-checking happens in build)
 ```
 
 ### Testing the DI pattern
