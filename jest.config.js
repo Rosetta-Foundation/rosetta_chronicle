@@ -1,6 +1,21 @@
 /** @type {import('jest').Config} */
 module.exports = {
-  preset: 'ts-jest',
+  // @swc/jest transpiles only (no per-file type-check); type-checking is the
+  // build's job (`tsc`, TypeScript 7 native). legacyDecorator+decoratorMetadata
+  // mirror the tsconfig flags InversifyJS requires.
+  transform: {
+    '^.+\\.ts$': [
+      '@swc/jest',
+      {
+        jsc: {
+          parser: { syntax: 'typescript', decorators: true },
+          transform: { legacyDecorator: true, decoratorMetadata: true },
+          target: 'es2022',
+        },
+        module: { type: 'commonjs' },
+      },
+    ],
+  },
   testEnvironment: 'node',
   roots: ['<rootDir>/src'],
   testMatch: ['**/__tests__/**/*.test.ts', '**/*.test.ts'],
