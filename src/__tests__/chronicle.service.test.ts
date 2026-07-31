@@ -539,6 +539,54 @@ describe('ChronicleService (DI wiring)', () => {
     expect(queried).not.toContain('/ws/my-chronicle');
   });
 
+  it('drops chronicle-typed ledger commits from git activity wherever they appear (ADR-0007)', async () => {
+    // Ledger and code sharing a repo: path exclusion cannot help — the
+    // message-based protocol must filter the ledger writes and keep the rest.
+    mockGitRepo.getActivity.mockResolvedValue([
+      {
+        source: 'git',
+        id: 'work-sha',
+        timestamp: '2026-07-21T10:00:00Z',
+        summary: 'feat: real engineering work',
+        evidence: [{ source: 'git', ref: 'work-sha', description: '' }],
+      },
+      {
+        source: 'git',
+        id: 'ledger-sha',
+        timestamp: '2026-07-21T18:00:00Z',
+        summary: 'chronicle(daily): 2026-07-20',
+        evidence: [{ source: 'git', ref: 'ledger-sha', description: '' }],
+      },
+      {
+        source: 'git',
+        id: 'legacy-sha',
+        timestamp: '2026-07-21T18:05:00Z',
+        summary: 'chore: daily chronicle 2026-07-19',
+        evidence: [{ source: 'git', ref: 'legacy-sha', description: '' }],
+      },
+    ]);
+
+    const service = container.get<{
+      generateDailyChronicle: (input: unknown) => Promise<{
+        markdown: string;
+        data: { activities: { id: string }[] };
+      }>;
+    }>(CHRONICLE_TOKENS.ChronicleService);
+
+    const result = await service.generateDailyChronicle({
+      window: { start: '2026-07-21', end: '2026-07-21' },
+      gitRepoPath: '/tmp/repo',
+      jiraTicketKeys: [],
+    });
+
+    const ids = result.data.activities.map((a) => a.id);
+    expect(ids).toContain('work-sha');
+    expect(ids).not.toContain('ledger-sha');
+    expect(ids).not.toContain('legacy-sha');
+    expect(result.markdown).toContain('real engineering work');
+    expect(result.markdown).not.toContain('chronicle(daily)');
+  });
+
   it('still queries an explicit gitRepoPath even if it equals the output repo', async () => {
     mockGitDiscoveryRepo.discover.mockResolvedValue([]);
 
