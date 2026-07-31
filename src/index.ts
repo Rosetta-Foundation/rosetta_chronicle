@@ -23,6 +23,10 @@ import {
   ClaudeCodeRepository,
 } from './repositories/claude-code.repository';
 import {
+  ICursorRepository,
+  CursorRepository,
+} from './repositories/cursor.repository';
+import {
   INotesRepository,
   NotesRepository,
 } from './repositories/notes.repository';
@@ -34,18 +38,12 @@ import {
   IChronicleRepository,
   ChronicleRepository,
 } from './repositories/chronicle.repository';
-import {
-  INotesStore,
-  NotesStore,
-} from './repositories/notes-store.repository';
+import { INotesStore, NotesStore } from './repositories/notes-store.repository';
 import {
   IChronicleStore,
   ChronicleStore,
 } from './repositories/chronicle-store.repository';
-import {
-  IQueueStore,
-  QueueStore,
-} from './repositories/queue-store.repository';
+import { IQueueStore, QueueStore } from './repositories/queue-store.repository';
 
 /**
  * Composition root. Wires the InversifyJS container and exposes a factory for
@@ -68,6 +66,9 @@ export const buildContainer = (): Container => {
     .bind<IClaudeCodeRepository>(CHRONICLE_TOKENS.ClaudeCodeRepository)
     .to(ClaudeCodeRepository);
   container
+    .bind<ICursorRepository>(CHRONICLE_TOKENS.CursorRepository)
+    .to(CursorRepository);
+  container
     .bind<INotesRepository>(CHRONICLE_TOKENS.NotesRepository)
     .to(NotesRepository);
   container
@@ -76,15 +77,11 @@ export const buildContainer = (): Container => {
   container
     .bind<IChronicleRepository>(CHRONICLE_TOKENS.ChronicleRepository)
     .to(ChronicleRepository);
-  container
-    .bind<INotesStore>(CHRONICLE_TOKENS.NotesStore)
-    .to(NotesStore);
+  container.bind<INotesStore>(CHRONICLE_TOKENS.NotesStore).to(NotesStore);
   container
     .bind<IChronicleStore>(CHRONICLE_TOKENS.ChronicleStore)
     .to(ChronicleStore);
-  container
-    .bind<IQueueStore>(CHRONICLE_TOKENS.QueueStore)
-    .to(QueueStore);
+  container.bind<IQueueStore>(CHRONICLE_TOKENS.QueueStore).to(QueueStore);
 
   // Services
   container

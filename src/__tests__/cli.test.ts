@@ -113,6 +113,72 @@ describe('chronicle CLI', () => {
     expect(result.stderr).toContain('session-id');
   });
 
+  it('append-session targets a Cursor session’s creation day, not today', () => {
+    // Fixture: a Cursor session created yesterday, under an isolated HOME.
+    const tmpHome = join(tmpdir(), `cli-test-cursor-home-${process.pid}`);
+    const project = '/tmp/cli-cursor-project';
+    const slug = 'tmp-cli-cursor-project';
+    const sessionId = 'aaaabbbb-cccc-dddd-eeee-ffff00001111';
+
+    const transcriptDir = join(
+      tmpHome,
+      '.cursor',
+      'projects',
+      slug,
+      'agent-transcripts',
+      sessionId,
+    );
+    mkdirSync(transcriptDir, { recursive: true });
+    writeFileSync(
+      join(transcriptDir, `${sessionId}.jsonl`),
+      JSON.stringify({
+        role: 'user',
+        message: { content: [{ type: 'text', text: 'yesterday work' }] },
+      }) + '\n',
+    );
+
+    const yesterday = new Date(Date.now() - 86_400_000);
+    const yesterdayDate = [
+      yesterday.getFullYear(),
+      String(yesterday.getMonth() + 1).padStart(2, '0'),
+      String(yesterday.getDate()).padStart(2, '0'),
+    ].join('-');
+    const metaDir = join(tmpHome, '.cursor', 'chats', 'hash', sessionId);
+    mkdirSync(metaDir, { recursive: true });
+    writeFileSync(
+      join(metaDir, 'meta.json'),
+      JSON.stringify({
+        title: 'Yesterday session',
+        createdAtMs: yesterday.getTime(),
+        cwd: project,
+      }),
+    );
+
+    const hookPayload = JSON.stringify({
+      session_id: sessionId,
+      cwd: project,
+      hook_event_name: 'Stop',
+      source: 'cursor',
+    });
+
+    const result = spawnSync(
+      process.execPath,
+      [CLI, 'append-session', '--project', project, '--dry-run'],
+      {
+        encoding: 'utf-8',
+        input: hookPayload,
+        env: { ...process.env, HOME: tmpHome },
+      },
+    );
+
+    rmSync(tmpHome, { recursive: true, force: true });
+
+    expect(result.status).toBe(0);
+    // The generated Chronicle covers the session's creation day.
+    expect(result.stdout).toContain(`_${yesterdayDate}_`);
+    expect(result.stdout).toContain('Yesterday session');
+  });
+
   it('append-session reads session_id from stdin JSON (Stop hook mode)', () => {
     // We can't easily test full append with a real JSONL, but we can verify it
     // reads stdin and attempts the operation (will fail gracefully with no valid

@@ -19,6 +19,7 @@ export const CHRONICLE_TOKENS = {
   GitDiscoveryRepository: Symbol.for('GitDiscoveryRepository'),
   JiraRepository: Symbol.for('JiraRepository'),
   ClaudeCodeRepository: Symbol.for('ClaudeCodeRepository'),
+  CursorRepository: Symbol.for('CursorRepository'),
   NotesRepository: Symbol.for('NotesRepository'),
   CalendarRepository: Symbol.for('CalendarRepository'),
 

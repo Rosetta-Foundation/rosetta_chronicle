@@ -13,7 +13,7 @@ downstream product.
 ## Where Chronicle sits
 
 ```
- Git · GitHub · Jira · Calendar · Claude Code · Confluence · Slack · Notes
+ Git · GitHub · Jira · Calendar · Claude Code · Cursor · Confluence · Slack · Notes
                               │
                               ▼
                        Chronicle Engine
@@ -32,8 +32,8 @@ v0.1 scope.
 ## MVP — v0.1 Daily Chronicle
 
 The first milestone is intentionally small: generate a **Daily Engineering Chronicle** from a day's
-Git changes, Jira tickets (with parent Epic and OKR), Claude Code conversation, and manual notes.
-See [`docs/mvp.md`](docs/mvp.md) for the input/output spec.
+Git changes, Jira tickets (with parent Epic and OKR), Claude Code and Cursor agent sessions, and
+manual notes. See [`docs/mvp.md`](docs/mvp.md) for the input/output spec.
 
 ## Development
 

@@ -21,6 +21,7 @@ import { parseExistingTags } from '../utils/chronicle-parse.utils';
 import type { IGitRepository } from '../repositories/git.repository';
 import type { IGitDiscoveryRepository } from '../repositories/git-discovery.repository';
 import type { IClaudeCodeRepository } from '../repositories/claude-code.repository';
+import type { ICursorRepository } from '../repositories/cursor.repository';
 import type { INotesRepository } from '../repositories/notes.repository';
 import type { ICalendarRepository } from '../repositories/calendar.repository';
 
@@ -40,8 +41,9 @@ export interface IChronicleService {
  *
  * Composes the source repositories to build a Daily Chronicle: resolves and
  * aggregates git activity across one or many repositories (via
- * {@link IGitDiscoveryRepository} + {@link IGitRepository}), gathers Claude
- * session and note activity in parallel, merges tags and notes carried over from
+ * {@link IGitDiscoveryRepository} + {@link IGitRepository}), gathers agent
+ * session (Claude Code + Cursor) and note activity in parallel, merges tags and
+ * notes carried over from
  * any prior Chronicle, infers taxonomy tags, composes the document sections, and
  * renders Markdown. All cross-repository composition lives here — per the HSR
  * rules this service depends only on repositories and never calls another
@@ -56,6 +58,8 @@ export class ChronicleService implements IChronicleService {
     private readonly _gitDiscoveryRepo: IGitDiscoveryRepository,
     @inject(CHRONICLE_TOKENS.ClaudeCodeRepository)
     private readonly _claudeCodeRepo: IClaudeCodeRepository,
+    @inject(CHRONICLE_TOKENS.CursorRepository)
+    private readonly _cursorRepo: ICursorRepository,
     @inject(CHRONICLE_TOKENS.NotesRepository)
     private readonly _notesRepo: INotesRepository,
     @inject(CHRONICLE_TOKENS.CalendarRepository)
@@ -75,15 +79,32 @@ export class ChronicleService implements IChronicleService {
       input.priorTags ??
       (input.existingMarkdown ? parseExistingTags(input.existingMarkdown) : []);
 
-    const [gitActivity, sessionActivity, typedNotes, calendarActivity] =
-      await Promise.all([
-        this._collectGitActivity(input),
-        input.claudeCodeProjectPath
-          ? this._claudeCodeRepo.getActivity(input.window, input.claudeCodeProjectPath)
-          : Promise.resolve([] as Activity[]),
-        this._notesRepo.getActivity(input.window, input.notes),
-        this._calendarRepo.getActivity(input.window, input.calendarIcsPath),
-      ]);
+    const [
+      gitActivity,
+      claudeActivity,
+      cursorActivity,
+      typedNotes,
+      calendarActivity,
+    ] = await Promise.all([
+      this._collectGitActivity(input),
+      input.claudeCodeProjectPath
+        ? this._claudeCodeRepo.getActivity(
+            input.window,
+            input.claudeCodeProjectPath,
+          )
+        : Promise.resolve([] as Activity[]),
+      input.cursorProjectPath
+        ? this._cursorRepo.getActivity(input.window, input.cursorProjectPath)
+        : Promise.resolve([] as Activity[]),
+      this._notesRepo.getActivity(input.window, input.notes),
+      this._calendarRepo.getActivity(input.window, input.calendarIcsPath),
+    ]);
+
+    // Claude Code and Cursor sessions are the same kind of activity — one
+    // agent-sessions stream, ordered by time regardless of tool.
+    const sessionActivity = [...claudeActivity, ...cursorActivity].sort(
+      (a, b) => a.timestamp.localeCompare(b.timestamp),
+    );
 
     // Calendar meetings are discussion-type activity: fold them into the notes
     // section (deduped by id — a hand-typed note and its calendar entry keep
@@ -92,9 +113,11 @@ export class ChronicleService implements IChronicleService {
       a.timestamp.localeCompare(b.timestamp),
     );
 
-    const activities = [...gitActivity, ...sessionActivity, ...noteActivity].sort(
-      (a, b) => a.timestamp.localeCompare(b.timestamp),
-    );
+    const activities = [
+      ...gitActivity,
+      ...sessionActivity,
+      ...noteActivity,
+    ].sort((a, b) => a.timestamp.localeCompare(b.timestamp));
 
     // Union freshly inferred tags with any tags carried over from a prior run,
     // preserving taxonomy order.
@@ -102,7 +125,11 @@ export class ChronicleService implements IChronicleService {
     const tagSet = new Set([...freshTags, ...priorTags]);
     const tags = ALL_TAGS.filter((t) => tagSet.has(t));
 
-    const sections = this._composeSections(gitActivity, sessionActivity, noteActivity);
+    const sections = this._composeSections(
+      gitActivity,
+      sessionActivity,
+      noteActivity,
+    );
     const markdown = renderDailyChronicle(input.window, sections, tags);
 
     return {
@@ -168,18 +195,26 @@ export class ChronicleService implements IChronicleService {
     sessionActivity: Activity[],
     noteActivity: Activity[],
   ): ChronicleSection[] {
-    const total = gitActivity.length + sessionActivity.length + noteActivity.length;
+    const total =
+      gitActivity.length + sessionActivity.length + noteActivity.length;
     const allEvidence: Evidence[] = [
       ...gitActivity,
       ...sessionActivity,
       ...noteActivity,
     ].flatMap((a) => a.evidence);
 
+    const claudeCount = sessionActivity.filter(
+      (a) => a.source === 'claude-code',
+    ).length;
+    const cursorCount = sessionActivity.filter(
+      (a) => a.source === 'cursor',
+    ).length;
+
     const parts: string[] = [];
     if (gitActivity.length > 0)
       parts.push(pluralize(gitActivity.length, 'commit'));
-    if (sessionActivity.length > 0)
-      parts.push(pluralize(sessionActivity.length, 'Claude session'));
+    if (claudeCount > 0) parts.push(pluralize(claudeCount, 'Claude session'));
+    if (cursorCount > 0) parts.push(pluralize(cursorCount, 'Cursor session'));
     if (noteActivity.length > 0)
       parts.push(pluralize(noteActivity.length, 'note'));
 
@@ -222,7 +257,7 @@ export class ChronicleService implements IChronicleService {
       }
 
       sections.push({
-        heading: 'Claude Sessions',
+        heading: 'Agent Sessions',
         body,
         evidence: sessionActivity.flatMap((a) => a.evidence),
       });

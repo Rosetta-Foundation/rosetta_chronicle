@@ -3,15 +3,21 @@ import 'reflect-metadata';
 import { getDailyChronicleHandler, buildContainer } from '../index';
 import { DailyChronicleInput, QueueItem, QueueState } from '../types';
 import { describeDropped, ClobberCheck } from '../utils/clobber.utils';
-import { formatQueueSummary, queueItemId, parseTags, prioritizeNext } from '../utils/queue.utils';
+import {
+  formatQueueSummary,
+  queueItemId,
+  parseTags,
+  prioritizeNext,
+} from '../utils/queue.utils';
 import { IQueueStore } from '../repositories/queue-store.repository';
+import { ICursorRepository } from '../repositories/cursor.repository';
 import { CHRONICLE_TOKENS } from '../tokens';
 
 /**
  * Chronicle CLI — two commands:
  *
  *   chronicle backfill   Generate and persist Chronicles for a date range.
- *   chronicle append-session   Append a single Claude Code session to today's Chronicle.
+ *   chronicle append-session   Append a single agent session to today's Chronicle.
  *
  * Both write to the personal Chronicle repo (CHRONICLE_REPO env var or --repo flag).
  * Both are idempotent: content-hash dedup means re-running is safe.
@@ -28,7 +34,8 @@ Usage:
 
 Commands:
   backfill            Generate Daily Chronicles for a date range and persist them.
-  append-session      Append a single Claude Code session to today's Chronicle.
+  append-session      Append a single agent session (Claude Code or Cursor) to
+                      today's Chronicle.
                       Reads a JSON payload from stdin when --session-id is omitted
                       (Stop hook mode: {"session_id":"...", "cwd":"..."}).
   queue               Manage the personal work queue (PRD-0007).
@@ -40,7 +47,8 @@ Commands:
 Options:
   --repo <path>       Absolute path to your personal Chronicle repo.
                       Falls back to $CHRONICLE_REPO environment variable.
-  --project <path>    Absolute path of the project to scope Claude Code sessions to.
+  --project <path>    Absolute path of the project to scope agent sessions
+                      (Claude Code + Cursor) to.
                       Falls back to $CHRONICLE_PROJECT or current working directory.
   --git-repo <path>   Git repo to include commits from. Defaults to --project.
   --calendar <path>   Path to an iCalendar (.ics) export to include the day's
@@ -103,7 +111,11 @@ function parseArgs(argv: string[]): ParsedArgs {
     } else if (['show', 'add', 'done', 'list'].includes(second)) {
       result.subcommand = second;
       // For add/done the title immediately follows the subcommand if it's not a flag.
-      if ((second === 'add' || second === 'done') && args[2] && !args[2].startsWith('-')) {
+      if (
+        (second === 'add' || second === 'done') &&
+        args[2] &&
+        !args[2].startsWith('-')
+      ) {
         result.title = args[2];
       }
     } else {
@@ -115,19 +127,45 @@ function parseArgs(argv: string[]): ParsedArgs {
   const startIdx = result.command === 'queue' && result.title ? 3 : 1;
   for (let i = startIdx; i < args.length; i++) {
     switch (args[i]) {
-      case '--repo': result.repo = args[++i]; break;
-      case '--project': result.project = args[++i]; break;
-      case '--git-repo': result.gitRepo = args[++i]; break;
-      case '--start': result.start = args[++i]; break;
-      case '--end': result.end = args[++i]; break;
-      case '--session-id': result.sessionId = args[++i]; break;
-      case '--dry-run': result.dryRun = true; break;
-      case '--force': result.force = true; break;
-      case '--calendar': result.calendar = args[++i]; break;
-      case '--jira': result.jira = args[++i]; break;
-      case '--prd': result.prd = args[++i]; break;
-      case '--due': result.due = args[++i]; break;
-      case '--state': result.state = args[++i] as QueueState; break;
+      case '--repo':
+        result.repo = args[++i];
+        break;
+      case '--project':
+        result.project = args[++i];
+        break;
+      case '--git-repo':
+        result.gitRepo = args[++i];
+        break;
+      case '--start':
+        result.start = args[++i];
+        break;
+      case '--end':
+        result.end = args[++i];
+        break;
+      case '--session-id':
+        result.sessionId = args[++i];
+        break;
+      case '--dry-run':
+        result.dryRun = true;
+        break;
+      case '--force':
+        result.force = true;
+        break;
+      case '--calendar':
+        result.calendar = args[++i];
+        break;
+      case '--jira':
+        result.jira = args[++i];
+        break;
+      case '--prd':
+        result.prd = args[++i];
+        break;
+      case '--due':
+        result.due = args[++i];
+        break;
+      case '--state':
+        result.state = args[++i] as QueueState;
+        break;
       case '-h':
       case '--help':
         console.log(USAGE);
@@ -149,7 +187,7 @@ function today(): string {
 /**
  * Resolve the git scope for a run. An explicit `--git-repo` means single-repo
  * mode; otherwise the workspace root drives discovery of every repo underneath
- * it (mirroring how Claude sessions are captured from the root).
+ * it (mirroring how agent sessions are captured from the root).
  */
 function gitScope(
   gitRepo: string | undefined,
@@ -179,17 +217,21 @@ function reportClobber(date: string, clobber: ClobberCheck): void {
 
 async function runBackfill(args: ParsedArgs): Promise<void> {
   const repo = args.repo ?? process.env['CHRONICLE_REPO'];
-  const project = args.project ?? process.env['CHRONICLE_PROJECT'] ?? process.cwd();
+  const project =
+    args.project ?? process.env['CHRONICLE_PROJECT'] ?? process.cwd();
   const calendar = args.calendar ?? process.env['CHRONICLE_CALENDAR'];
   const start = args.start;
   const end = args.end ?? today();
 
   if (!start) die('--start <date> is required for backfill');
-  if (!repo && !args.dryRun) die('--repo <path> (or $CHRONICLE_REPO) is required');
+  if (!repo && !args.dryRun)
+    die('--repo <path> (or $CHRONICLE_REPO) is required');
 
   // Enumerate every date in [start, end]
   const dates = enumerateDates(start, end);
-  console.error(`chronicle backfill: ${dates.length} day(s) from ${start} to ${end}`);
+  console.error(
+    `chronicle backfill: ${dates.length} day(s) from ${start} to ${end}`,
+  );
 
   const handler = getDailyChronicleHandler();
   let blocked = 0;
@@ -198,11 +240,15 @@ async function runBackfill(args: ParsedArgs): Promise<void> {
     const input: DailyChronicleInput = {
       window: { start: date, end: date },
       // Explicit --git-repo → single repo; otherwise discover every repo under
-      // the workspace root (mirrors how Claude sessions are captured from root).
+      // the workspace root (mirrors how agent sessions are captured from root).
       ...gitScope(args.gitRepo, project),
       jiraTicketKeys: [],
       claudeCodeProjectPath: project,
+      cursorProjectPath: project,
       force: args.force,
+      // Range runs skip quiet days — never commit empty Chronicles for
+      // weekends or vacations.
+      skipEmpty: true,
       ...(calendar ? { calendarIcsPath: calendar } : {}),
       ...(repo && !args.dryRun ? { outputRepoPath: repo } : {}),
     };
@@ -217,12 +263,16 @@ async function runBackfill(args: ParsedArgs): Promise<void> {
     } else if (result.clobberPrevented) {
       blocked++;
       reportClobber(date, result.clobberPrevented);
+    } else if (result.skippedEmpty) {
+      console.error(`  · ${date} (no activity — skipped)`);
     } else {
       const p = result.persisted;
       if (p?.committed) {
         console.error(`  ✓ ${date} → ${p.path} (committed)`);
       } else if (p) {
-        console.error(`  ~ ${date} → ${p.path} (written, not committed — already up to date?)`);
+        console.error(
+          `  ~ ${date} → ${p.path} (written, not committed — already up to date?)`,
+        );
       } else {
         console.error(`  ✗ ${date} (failed to persist)`);
       }
@@ -241,11 +291,15 @@ async function runAppendSession(args: ParsedArgs): Promise<void> {
   const repo = args.repo ?? process.env['CHRONICLE_REPO'];
   let project = args.project ?? process.env['CHRONICLE_PROJECT'];
   let sessionId = args.sessionId;
+  let sourceHint: string | undefined;
 
   // Stop hook mode: read JSON payload from stdin when session-id not provided.
   if (!sessionId) {
     const payload = await readStdin();
-    if (!payload.trim()) die('--session-id is required, or pipe a JSON payload from the Stop hook');
+    if (!payload.trim())
+      die(
+        '--session-id is required, or pipe a JSON payload from the Stop hook',
+      );
     let hookData: Record<string, string>;
     try {
       hookData = JSON.parse(payload);
@@ -253,6 +307,7 @@ async function runAppendSession(args: ParsedArgs): Promise<void> {
       die(`could not parse stdin as JSON: ${payload.slice(0, 100)}`);
     }
     sessionId = hookData['session_id'];
+    sourceHint = hookData['source'];
     // cwd from the hook payload scopes the project if not set explicitly.
     if (!project && hookData['cwd']) {
       project = hookData['cwd'];
@@ -260,10 +315,24 @@ async function runAppendSession(args: ParsedArgs): Promise<void> {
   }
 
   if (!sessionId) die('could not determine session_id');
-  if (!repo && !args.dryRun) die('--repo <path> (or $CHRONICLE_REPO) is required');
+  if (!repo && !args.dryRun)
+    die('--repo <path> (or $CHRONICLE_REPO) is required');
 
   project = project ?? process.cwd();
-  const date = today();
+
+  // Cursor sessions are attributed to their creation day, so a stop event for
+  // a session whose later turns crossed midnight must regenerate that day, not
+  // today. Claude sessions anchor to in-window user records, so today's window
+  // already captures them correctly.
+  let date = today();
+  if (sourceHint === 'cursor') {
+    const cursorRepo = buildContainer().get<ICursorRepository>(
+      CHRONICLE_TOKENS.CursorRepository,
+    );
+    const sessionDate = await cursorRepo.findSessionDate(sessionId);
+    if (sessionDate) date = sessionDate;
+  }
+
   const calendar = args.calendar ?? process.env['CHRONICLE_CALENDAR'];
 
   const input: DailyChronicleInput = {
@@ -271,6 +340,7 @@ async function runAppendSession(args: ParsedArgs): Promise<void> {
     ...gitScope(args.gitRepo, project),
     jiraTicketKeys: [],
     claudeCodeProjectPath: project,
+    cursorProjectPath: project,
     force: args.force,
     ...(calendar ? { calendarIcsPath: calendar } : {}),
     ...(repo && !args.dryRun ? { outputRepoPath: repo } : {}),
@@ -292,11 +362,17 @@ async function runAppendSession(args: ParsedArgs): Promise<void> {
   } else {
     const p = result.persisted;
     if (p?.committed) {
-      console.error(`chronicle: appended session ${sessionId.slice(0, 8)} → ${p.path}`);
+      console.error(
+        `chronicle: appended session ${sessionId.slice(0, 8)} → ${p.path}`,
+      );
     } else if (p) {
-      console.error(`chronicle: session ${sessionId.slice(0, 8)} already recorded (${p.path})`);
+      console.error(
+        `chronicle: session ${sessionId.slice(0, 8)} already recorded (${p.path})`,
+      );
     } else {
-      console.error(`chronicle: session ${sessionId.slice(0, 8)} — no repo to persist to`);
+      console.error(
+        `chronicle: session ${sessionId.slice(0, 8)} — no repo to persist to`,
+      );
     }
   }
 }
@@ -327,7 +403,8 @@ function enumerateDates(start: string, end: string): string[] {
 
 async function runQueue(args: ParsedArgs): Promise<void> {
   const repo = args.repo ?? process.env['CHRONICLE_REPO'];
-  if (!repo) die('--repo <path> (or $CHRONICLE_REPO) is required for queue commands');
+  if (!repo)
+    die('--repo <path> (or $CHRONICLE_REPO) is required for queue commands');
 
   const container = buildContainer();
   const store = container.get<IQueueStore>(CHRONICLE_TOKENS.QueueStore);
@@ -350,7 +427,9 @@ async function runQueue(args: ParsedArgs): Promise<void> {
       if (args.prd) refs.push({ type: 'prd' as const, key: args.prd });
       if (args.due) signals.push({ type: 'due' as const, value: args.due });
 
-      const stableKey = refs.find((r) => r.type === 'jira' || r.type === 'prd')?.key;
+      const stableKey = refs.find(
+        (r) => r.type === 'jira' || r.type === 'prd',
+      )?.key;
       const id = stableKey ? queueItemId(stableKey) : queueItemId(title);
       const item: QueueItem = {
         id,
@@ -373,11 +452,18 @@ async function runQueue(args: ParsedArgs): Promise<void> {
         titleOrId.length === 12 && /^[0-9a-f]+$/.test(titleOrId)
           ? titleOrId
           : queueItemId(titleOrId);
-      const idx = items.findIndex((i) => i.id === targetId || i.title === titleOrId);
-      if (idx === -1) die(`chronicle queue done: no item matching "${titleOrId}"`);
+      const idx = items.findIndex(
+        (i) => i.id === targetId || i.title === titleOrId,
+      );
+      if (idx === -1)
+        die(`chronicle queue done: no item matching "${titleOrId}"`);
       const updated: QueueItem[] = items.map((item, i) =>
         i === idx
-          ? { ...item, state: 'done' as const, closedAt: new Date().toISOString() }
+          ? {
+              ...item,
+              state: 'done' as const,
+              closedAt: new Date().toISOString(),
+            }
           : item,
       );
       await store.write(repo, updated);
@@ -387,7 +473,9 @@ async function runQueue(args: ParsedArgs): Promise<void> {
 
     case 'list': {
       const items = await store.read(repo);
-      const filtered = args.state ? items.filter((i) => i.state === args.state) : items;
+      const filtered = args.state
+        ? items.filter((i) => i.state === args.state)
+        : items;
       const todayDate = today();
       const ordered =
         args.state === 'next' || !args.state
@@ -405,7 +493,9 @@ async function runQueue(args: ParsedArgs): Promise<void> {
       for (const item of ordered) {
         const dueSignal = item.signals.find((s) => s.type === 'due');
         const blockedSignal = item.signals.find((s) => s.type === 'blocked');
-        const primaryRef = item.refs.find((r) => r.type === 'jira' || r.type === 'prd');
+        const primaryRef = item.refs.find(
+          (r) => r.type === 'jira' || r.type === 'prd',
+        );
         const check = item.state === 'done' ? 'x' : ' ';
         const tags = [
           primaryRef ? `[${primaryRef.type}:${primaryRef.key}]` : '',

@@ -10,6 +10,7 @@ describe('ChronicleService (DI wiring)', () => {
   let mockGitRepo: { getActivity: jest.Mock };
   let mockGitDiscoveryRepo: { discover: jest.Mock };
   let mockClaudeCodeRepo: { getActivity: jest.Mock };
+  let mockCursorRepo: { getActivity: jest.Mock };
   let mockNotesRepo: { getActivity: jest.Mock };
   let mockCalendarRepo: { getActivity: jest.Mock };
 
@@ -17,13 +18,12 @@ describe('ChronicleService (DI wiring)', () => {
     mockGitRepo = { getActivity: jest.fn().mockResolvedValue([]) };
     mockGitDiscoveryRepo = { discover: jest.fn().mockResolvedValue([]) };
     mockClaudeCodeRepo = { getActivity: jest.fn().mockResolvedValue([]) };
+    mockCursorRepo = { getActivity: jest.fn().mockResolvedValue([]) };
     mockNotesRepo = { getActivity: jest.fn().mockResolvedValue([]) };
     mockCalendarRepo = { getActivity: jest.fn().mockResolvedValue([]) };
 
     container = new Container();
-    container
-      .bind(CHRONICLE_TOKENS.GitRepository)
-      .toConstantValue(mockGitRepo);
+    container.bind(CHRONICLE_TOKENS.GitRepository).toConstantValue(mockGitRepo);
     container
       .bind(CHRONICLE_TOKENS.GitDiscoveryRepository)
       .toConstantValue(mockGitDiscoveryRepo);
@@ -31,14 +31,15 @@ describe('ChronicleService (DI wiring)', () => {
       .bind(CHRONICLE_TOKENS.ClaudeCodeRepository)
       .toConstantValue(mockClaudeCodeRepo);
     container
+      .bind(CHRONICLE_TOKENS.CursorRepository)
+      .toConstantValue(mockCursorRepo);
+    container
       .bind(CHRONICLE_TOKENS.NotesRepository)
       .toConstantValue(mockNotesRepo);
     container
       .bind(CHRONICLE_TOKENS.CalendarRepository)
       .toConstantValue(mockCalendarRepo);
-    container
-      .bind(CHRONICLE_TOKENS.ChronicleService)
-      .to(ChronicleService);
+    container.bind(CHRONICLE_TOKENS.ChronicleService).to(ChronicleService);
   });
 
   it('resolves ChronicleService with its repository dependencies', () => {
@@ -54,7 +55,11 @@ describe('ChronicleService (DI wiring)', () => {
         timestamp: '2026-07-21T14:00:00Z',
         summary: 'feat: add chronicle git source adapter',
         evidence: [
-          { source: 'git', ref: 'abc123def456', description: 'abc123de feat: … (Russ)' },
+          {
+            source: 'git',
+            ref: 'abc123def456',
+            description: 'abc123de feat: … (Russ)',
+          },
         ],
       },
     ]);
@@ -117,11 +122,15 @@ describe('ChronicleService (DI wiring)', () => {
       { start: '2026-07-21', end: '2026-07-21' },
       '- discussed Entra/Okta federation with Vinay',
     );
-    expect(result.sections.map((s) => s.heading)).toContain('Notes & Discussions');
-    expect(result.markdown).toContain('discussed Entra/Okta federation with Vinay');
+    expect(result.sections.map((s) => s.heading)).toContain(
+      'Notes & Discussions',
+    );
+    expect(result.markdown).toContain(
+      'discussed Entra/Okta federation with Vinay',
+    );
   });
 
-  it('adds a Claude Sessions section with titled and untitled sessions', async () => {
+  it('adds an Agent Sessions section with titled and untitled sessions', async () => {
     mockClaudeCodeRepo.getActivity.mockResolvedValue([
       {
         source: 'claude-code',
@@ -130,7 +139,12 @@ describe('ChronicleService (DI wiring)', () => {
         summary: 'Build the thing',
         evidence: [
           { source: 'claude-code', ref: 'sess-titled', description: 'session' },
-          { source: 'claude-code', ref: 'org/repo#42', description: 'PR org/repo#42', url: 'https://github.com/org/repo/pull/42' },
+          {
+            source: 'claude-code',
+            ref: 'org/repo#42',
+            description: 'PR org/repo#42',
+            url: 'https://github.com/org/repo/pull/42',
+          },
         ],
       },
       {
@@ -138,7 +152,13 @@ describe('ChronicleService (DI wiring)', () => {
         id: 'sess-untitled',
         timestamp: '2026-07-21T11:00:00Z',
         summary: 'Investigate something [needs-review]',
-        evidence: [{ source: 'claude-code', ref: 'sess-untitled', description: 'session' }],
+        evidence: [
+          {
+            source: 'claude-code',
+            ref: 'sess-untitled',
+            description: 'session',
+          },
+        ],
         reviewNeeded: true,
       },
     ]);
@@ -161,7 +181,9 @@ describe('ChronicleService (DI wiring)', () => {
       { start: '2026-07-21', end: '2026-07-21' },
       '/tmp/project',
     );
-    const sessionsSection = result.sections.find((s) => s.heading === 'Claude Sessions');
+    const sessionsSection = result.sections.find(
+      (s) => s.heading === 'Agent Sessions',
+    );
     expect(sessionsSection).toBeDefined();
     expect(sessionsSection!.body).toContain('Build the thing');
     expect(sessionsSection!.body).toContain('org/repo#42'); // PR link rendered
@@ -173,7 +195,9 @@ describe('ChronicleService (DI wiring)', () => {
 
   it('skips Claude Code source when claudeCodeProjectPath is not provided', async () => {
     const service = container.get<{
-      generateDailyChronicle: (input: unknown) => Promise<{ sections: { heading: string }[] }>;
+      generateDailyChronicle: (
+        input: unknown,
+      ) => Promise<{ sections: { heading: string }[] }>;
     }>(CHRONICLE_TOKENS.ChronicleService);
 
     await service.generateDailyChronicle({
@@ -183,18 +207,80 @@ describe('ChronicleService (DI wiring)', () => {
     });
 
     expect(mockClaudeCodeRepo.getActivity).not.toHaveBeenCalled();
+    expect(mockCursorRepo.getActivity).not.toHaveBeenCalled();
+  });
+
+  it('merges Claude and Cursor sessions into one time-ordered Agent Sessions section', async () => {
+    mockClaudeCodeRepo.getActivity.mockResolvedValue([
+      {
+        source: 'claude-code',
+        id: 'claude-sess',
+        timestamp: '2026-07-21T14:00:00Z',
+        summary: 'Claude afternoon session',
+        evidence: [
+          { source: 'claude-code', ref: 'claude-sess', description: 'session' },
+        ],
+      },
+    ]);
+    mockCursorRepo.getActivity.mockResolvedValue([
+      {
+        source: 'cursor',
+        id: 'cursor-sess',
+        timestamp: '2026-07-21T09:00:00Z',
+        summary: 'Cursor morning session',
+        evidence: [
+          { source: 'cursor', ref: 'cursor-sess', description: 'session' },
+        ],
+      },
+    ]);
+
+    const service = container.get<{
+      generateDailyChronicle: (input: unknown) => Promise<{
+        markdown: string;
+        sections: { heading: string; body: string }[];
+      }>;
+    }>(CHRONICLE_TOKENS.ChronicleService);
+
+    const result = await service.generateDailyChronicle({
+      window: { start: '2026-07-21', end: '2026-07-21' },
+      gitRepoPath: '/tmp/repo',
+      jiraTicketKeys: [],
+      claudeCodeProjectPath: '/tmp/project',
+      cursorProjectPath: '/tmp/project',
+    });
+
+    expect(mockCursorRepo.getActivity).toHaveBeenCalledWith(
+      { start: '2026-07-21', end: '2026-07-21' },
+      '/tmp/project',
+    );
+    const sessionsSection = result.sections.find(
+      (s) => s.heading === 'Agent Sessions',
+    );
+    expect(sessionsSection).toBeDefined();
+    // Cursor session came first chronologically, so it renders first.
+    const cursorIdx = sessionsSection!.body.indexOf('Cursor morning session');
+    const claudeIdx = sessionsSection!.body.indexOf('Claude afternoon session');
+    expect(cursorIdx).toBeGreaterThanOrEqual(0);
+    expect(cursorIdx).toBeLessThan(claudeIdx);
+    // Summary counts each tool separately.
+    expect(result.markdown).toContain('1 Claude session');
+    expect(result.markdown).toContain('1 Cursor session');
   });
 
   it('merges prior tags from existingMarkdown with freshly inferred tags', async () => {
     // Fresh activity only infers DELIVERY; prior Chronicle had CROSS-TEAM and ARCH too.
     mockGitRepo.getActivity.mockResolvedValue([
       {
-        source: 'git', id: 'abc', timestamp: '2026-07-21T10:00:00Z',
-        summary: 'feat: ship thing', evidence: [{ source: 'git', ref: 'abc', description: '' }],
+        source: 'git',
+        id: 'abc',
+        timestamp: '2026-07-21T10:00:00Z',
+        summary: 'feat: ship thing',
+        evidence: [{ source: 'git', ref: 'abc', description: '' }],
       },
     ]);
 
-    const existingMarkdown = '## Suggested Tags\n\n`[DELIVERY]` `[CROSS-TEAM]` `[ARCH]`\n';
+    const existingMarkdown =
+      '## Suggested Tags\n\n`[DELIVERY]` `[CROSS-TEAM]` `[ARCH]`\n';
 
     const service = container.get<{
       generateDailyChronicle: (input: unknown) => Promise<{ tags: string[] }>;
@@ -207,16 +293,19 @@ describe('ChronicleService (DI wiring)', () => {
       existingMarkdown,
     });
 
-    expect(result.tags).toContain('DELIVERY');   // freshly inferred
+    expect(result.tags).toContain('DELIVERY'); // freshly inferred
     expect(result.tags).toContain('CROSS-TEAM'); // preserved from prior
-    expect(result.tags).toContain('ARCH');       // preserved from prior
+    expect(result.tags).toContain('ARCH'); // preserved from prior
   });
 
   it('prefers priorTags over existingMarkdown when both are present', async () => {
     mockGitRepo.getActivity.mockResolvedValue([
       {
-        source: 'git', id: 'abc', timestamp: '2026-07-21T10:00:00Z',
-        summary: 'feat: ship thing', evidence: [{ source: 'git', ref: 'abc', description: '' }],
+        source: 'git',
+        id: 'abc',
+        timestamp: '2026-07-21T10:00:00Z',
+        summary: 'feat: ship thing',
+        evidence: [{ source: 'git', ref: 'abc', description: '' }],
       },
     ]);
 
@@ -232,23 +321,29 @@ describe('ChronicleService (DI wiring)', () => {
       existingMarkdown: '## Suggested Tags\n\n`[ARCH]`\n', // legacy — must be ignored
     });
 
-    expect(result.tags).toContain('DELIVERY');  // freshly inferred
-    expect(result.tags).toContain('SECURITY');  // from priorTags (sidecar)
-    expect(result.tags).not.toContain('ARCH');  // markdown ignored when priorTags present
+    expect(result.tags).toContain('DELIVERY'); // freshly inferred
+    expect(result.tags).toContain('SECURITY'); // from priorTags (sidecar)
+    expect(result.tags).not.toContain('ARCH'); // markdown ignored when priorTags present
   });
 
   it('returns a structured data sidecar of all activity and unioned tags', async () => {
     mockGitRepo.getActivity.mockResolvedValue([
       {
-        source: 'git', id: 'g1', timestamp: '2026-07-21T10:00:00Z',
-        summary: 'feat: ship thing', repo: 'repo-a',
+        source: 'git',
+        id: 'g1',
+        timestamp: '2026-07-21T10:00:00Z',
+        summary: 'feat: ship thing',
+        repo: 'repo-a',
         evidence: [{ source: 'git', ref: 'g1', description: '' }],
       },
     ]);
     mockNotesRepo.getActivity.mockResolvedValue([
       {
-        source: 'notes', id: 'n1', timestamp: '2026-07-21T00:00:00',
-        summary: 'a note', evidence: [{ source: 'notes', ref: 'n1', description: '' }],
+        source: 'notes',
+        id: 'n1',
+        timestamp: '2026-07-21T00:00:00',
+        summary: 'a note',
+        evidence: [{ source: 'notes', ref: 'n1', description: '' }],
       },
     ]);
 
@@ -266,7 +361,10 @@ describe('ChronicleService (DI wiring)', () => {
       notes: '- a note',
     });
 
-    expect(result.data.window).toEqual({ start: '2026-07-21', end: '2026-07-21' });
+    expect(result.data.window).toEqual({
+      start: '2026-07-21',
+      end: '2026-07-21',
+    });
     expect(result.data.tags).toEqual(result.tags);
     // Sidecar carries the structured activity, not rendered Markdown.
     expect(result.data.activities.map((a) => a.id)).toContain('g1');
@@ -291,14 +389,17 @@ describe('ChronicleService (DI wiring)', () => {
     });
 
     // NotesRepository received exactly the input notes — not the markdown-scraped one.
-    const notesArg: string | undefined = mockNotesRepo.getActivity.mock.calls[0][1];
+    const notesArg: string | undefined =
+      mockNotesRepo.getActivity.mock.calls[0][1];
     expect(notesArg).toBe('- authoritative note');
     expect(notesArg).not.toContain('note only in old markdown');
   });
 
   it('produces an empty-but-valid Chronicle when there is no activity', async () => {
     const service = container.get<{
-      generateDailyChronicle: (input: unknown) => Promise<{ markdown: string; tags: string[] }>;
+      generateDailyChronicle: (
+        input: unknown,
+      ) => Promise<{ markdown: string; tags: string[] }>;
     }>(CHRONICLE_TOKENS.ChronicleService);
 
     const result = await service.generateDailyChronicle({
@@ -324,7 +425,9 @@ describe('ChronicleService (DI wiring)', () => {
           timestamp: '2026-07-21T10:00:00Z',
           summary: `feat: work in ${repoPath}`,
           repo: repoPath.split('/').pop(),
-          evidence: [{ source: 'git', ref: `${repoPath}-sha`, description: '' }],
+          evidence: [
+            { source: 'git', ref: `${repoPath}-sha`, description: '' },
+          ],
         },
       ]),
     );
@@ -340,7 +443,10 @@ describe('ChronicleService (DI wiring)', () => {
       jiraTicketKeys: [],
     });
 
-    expect(mockGitDiscoveryRepo.discover).toHaveBeenCalledWith('/ws', undefined);
+    expect(mockGitDiscoveryRepo.discover).toHaveBeenCalledWith(
+      '/ws',
+      undefined,
+    );
     // Both discovered repos were queried.
     expect(mockGitRepo.getActivity).toHaveBeenCalledWith(
       '/ws/repo-a',
@@ -407,7 +513,9 @@ describe('ChronicleService (DI wiring)', () => {
           timestamp: '2026-07-21T10:00:00Z',
           summary: `work in ${repoPath}`,
           repo: repoPath.split('/').pop(),
-          evidence: [{ source: 'git', ref: `${repoPath}-sha`, description: '' }],
+          evidence: [
+            { source: 'git', ref: `${repoPath}-sha`, description: '' },
+          ],
         },
       ]),
     );
@@ -424,7 +532,9 @@ describe('ChronicleService (DI wiring)', () => {
       jiraTicketKeys: [],
     });
 
-    const queried = mockGitRepo.getActivity.mock.calls.map((c: unknown[]) => c[0]);
+    const queried = mockGitRepo.getActivity.mock.calls.map(
+      (c: unknown[]) => c[0],
+    );
     expect(queried).toContain('/ws/repo-a');
     expect(queried).not.toContain('/ws/my-chronicle');
   });
@@ -443,7 +553,9 @@ describe('ChronicleService (DI wiring)', () => {
       jiraTicketKeys: [],
     });
 
-    const queried = mockGitRepo.getActivity.mock.calls.map((c: unknown[]) => c[0]);
+    const queried = mockGitRepo.getActivity.mock.calls.map(
+      (c: unknown[]) => c[0],
+    );
     expect(queried).toContain('/ws/my-chronicle'); // explicit request honored
   });
 });
