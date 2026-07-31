@@ -22,6 +22,14 @@ set -a
 source "$ENV_FILE"
 set +a
 
+# Fire the trailing catch-up sweep in the background — heals recent days
+# (late titles, sessions that ended without a stop event) without blocking
+# session start. The sweep self-throttles to one attempt per day.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -x "$SCRIPT_DIR/chronicle-sweep.sh" ]]; then
+  nohup "$SCRIPT_DIR/chronicle-sweep.sh" </dev/null >/dev/null 2>&1 &
+fi
+
 node -e '
 const repo = process.env.CHRONICLE_REPO || "";
 const project = process.env.CHRONICLE_PROJECT || "";

@@ -11,6 +11,7 @@ The v0.1 Daily Chronicle is synthesized from:
 - **Git changes** — commits/diffs for the day (`GitRepository`)
 - **Current Jira tickets** — including their **parent Epic** and **parent OKR** (`JiraRepository`)
 - **Claude Code conversation** — the day's AI-assisted work (`ClaudeCodeRepository`)
+- **Cursor agent sessions** — Cursor Agent/CLI transcripts + session metadata (`CursorRepository`)
 - **Manual notes** — free-form engineer notes (`NotesRepository`)
 
 Each input contributes `Activity` records; each generated statement in the output must carry

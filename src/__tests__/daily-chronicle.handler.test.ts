@@ -16,7 +16,11 @@ describe('DailyChronicleHandler (generate → persist composition)', () => {
     sections: [],
     tags: [],
     markdown: '# Daily Chronicle',
-    data: { window: { start: '2026-07-22', end: '2026-07-22' }, tags: [], activities: [] },
+    data: {
+      window: { start: '2026-07-22', end: '2026-07-22' },
+      tags: [],
+      activities: [],
+    },
   };
 
   beforeEach(() => {
@@ -26,7 +30,10 @@ describe('DailyChronicleHandler (generate → persist composition)', () => {
     mockRepo = {
       persistDaily: jest
         .fn()
-        .mockResolvedValue({ path: '/repo/chronicles/2026-07-22.md', committed: true }),
+        .mockResolvedValue({
+          path: '/repo/chronicles/2026-07-22.md',
+          committed: true,
+        }),
       readDaily: jest.fn().mockResolvedValue(null),
     };
     mockNotesStore = {
@@ -39,11 +46,19 @@ describe('DailyChronicleHandler (generate → persist composition)', () => {
     };
 
     container = new Container();
-    container.bind(CHRONICLE_TOKENS.ChronicleService).toConstantValue(mockService);
-    container.bind(CHRONICLE_TOKENS.ChronicleRepository).toConstantValue(mockRepo);
+    container
+      .bind(CHRONICLE_TOKENS.ChronicleService)
+      .toConstantValue(mockService);
+    container
+      .bind(CHRONICLE_TOKENS.ChronicleRepository)
+      .toConstantValue(mockRepo);
     container.bind(CHRONICLE_TOKENS.NotesStore).toConstantValue(mockNotesStore);
-    container.bind(CHRONICLE_TOKENS.ChronicleStore).toConstantValue(mockChronicleStore);
-    container.bind(CHRONICLE_TOKENS.DailyChronicleHandler).to(DailyChronicleHandler);
+    container
+      .bind(CHRONICLE_TOKENS.ChronicleStore)
+      .toConstantValue(mockChronicleStore);
+    container
+      .bind(CHRONICLE_TOKENS.DailyChronicleHandler)
+      .to(DailyChronicleHandler);
   });
 
   const getHandler = () =>
@@ -76,11 +91,78 @@ describe('DailyChronicleHandler (generate → persist composition)', () => {
       outputRepoPath: '/personal/chronicle',
     });
 
-    expect(mockRepo.persistDaily).toHaveBeenCalledWith('/personal/chronicle', generated);
+    expect(mockRepo.persistDaily).toHaveBeenCalledWith(
+      '/personal/chronicle',
+      generated,
+    );
     expect(result.persisted).toEqual({
       path: '/repo/chronicles/2026-07-22.md',
       committed: true,
     });
+  });
+
+  it('skips persistence for an empty day when skipEmpty is set', async () => {
+    // generated fixture has zero activities and there is no prior Chronicle.
+    const result = await getHandler().handle({
+      window: { start: '2026-07-22', end: '2026-07-22' },
+      gitRepoPath: '/tmp/repo',
+      jiraTicketKeys: [],
+      outputRepoPath: '/personal/chronicle',
+      skipEmpty: true,
+    });
+
+    expect(mockRepo.persistDaily).not.toHaveBeenCalled();
+    expect(mockChronicleStore.writeDaily).not.toHaveBeenCalled();
+    expect((result as { skippedEmpty?: boolean }).skippedEmpty).toBe(true);
+    expect(result.persisted).toBeUndefined();
+  });
+
+  it('persists an empty day with skipEmpty when a prior Chronicle exists', async () => {
+    mockChronicleStore.readDaily.mockResolvedValue({
+      window: { start: '2026-07-22', end: '2026-07-22' },
+      tags: [],
+      activities: [],
+    });
+
+    const result = await getHandler().handle({
+      window: { start: '2026-07-22', end: '2026-07-22' },
+      gitRepoPath: '/tmp/repo',
+      jiraTicketKeys: [],
+      outputRepoPath: '/personal/chronicle',
+      skipEmpty: true,
+    });
+
+    expect(mockRepo.persistDaily).toHaveBeenCalled();
+    expect((result as { skippedEmpty?: boolean }).skippedEmpty).toBeUndefined();
+  });
+
+  it('persists a day with activity normally when skipEmpty is set', async () => {
+    mockService.generateDailyChronicle.mockResolvedValue({
+      ...generated,
+      data: {
+        ...generated.data,
+        activities: [
+          {
+            source: 'git',
+            id: 'sha1',
+            timestamp: '2026-07-22T10:00:00Z',
+            summary: 'feat: work',
+            evidence: [],
+          },
+        ],
+      },
+    });
+
+    const result = await getHandler().handle({
+      window: { start: '2026-07-22', end: '2026-07-22' },
+      gitRepoPath: '/tmp/repo',
+      jiraTicketKeys: [],
+      outputRepoPath: '/personal/chronicle',
+      skipEmpty: true,
+    });
+
+    expect(mockRepo.persistDaily).toHaveBeenCalled();
+    expect((result as { skippedEmpty?: boolean }).skippedEmpty).toBeUndefined();
   });
 
   it('writes the structured sidecar (source of truth) when persisting', async () => {
@@ -145,7 +227,10 @@ describe('DailyChronicleHandler (generate → persist composition)', () => {
       outputRepoPath: '/personal/chronicle',
     });
 
-    expect(mockRepo.readDaily).toHaveBeenCalledWith('/personal/chronicle', '2026-07-22');
+    expect(mockRepo.readDaily).toHaveBeenCalledWith(
+      '/personal/chronicle',
+      '2026-07-22',
+    );
     const callArg = mockService.generateDailyChronicle.mock.calls[0][0];
     expect(callArg.existingMarkdown).toBe(existingMd);
   });
@@ -176,7 +261,9 @@ describe('DailyChronicleHandler (generate → persist composition)', () => {
   });
 
   it('appends inline notes to the store and passes the stored notes to the service', async () => {
-    mockNotesStore.readDaily.mockResolvedValue('- yesterday note\n- new note\n');
+    mockNotesStore.readDaily.mockResolvedValue(
+      '- yesterday note\n- new note\n',
+    );
 
     await getHandler().handle({
       window: { start: '2026-07-22', end: '2026-07-22' },
@@ -201,7 +288,9 @@ describe('DailyChronicleHandler (generate → persist composition)', () => {
     mockRepo.readDaily.mockResolvedValue(
       '## Notes & Discussions\n\n- prior note one\n- prior note two\n',
     );
-    mockNotesStore.readDaily.mockResolvedValue('- prior note one\n- prior note two\n');
+    mockNotesStore.readDaily.mockResolvedValue(
+      '- prior note one\n- prior note two\n',
+    );
 
     await getHandler().handle({
       window: { start: '2026-07-22', end: '2026-07-22' },
@@ -286,7 +375,9 @@ describe('DailyChronicleHandler (generate → persist composition)', () => {
       tags: [],
       activities: [activity('a')],
     });
-    mockService.generateDailyChronicle.mockResolvedValue(generatedWith(['a', 'b']));
+    mockService.generateDailyChronicle.mockResolvedValue(
+      generatedWith(['a', 'b']),
+    );
 
     const result = await getHandler().handle({
       window: { start: '2026-07-22', end: '2026-07-22' },

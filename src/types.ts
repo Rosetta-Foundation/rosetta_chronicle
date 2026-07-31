@@ -15,14 +15,9 @@ export const NEEDS_REVIEW_MARKER = '[needs-review]';
 
 /** The activity sources Chronicle can observe. New sources are added here. */
 export type ActivitySource =
-  | 'git'
-  | 'jira'
-  | 'claude-code'
-  | 'notes'
-  | 'calendar'
-  // future: 'github' | 'slack' | 'confluence'
-  ;
+  'git' | 'jira' | 'claude-code' | 'cursor' | 'notes' | 'calendar';
 
+// future: 'github' | 'slack' | 'confluence'
 /** The Rosetta tag taxonomy (see docs/mvp.md). */
 export type Tag =
   | 'DELIVERY'
@@ -120,6 +115,13 @@ export interface DailyChronicleInput {
    */
   claudeCodeProjectPath?: string;
   /**
+   * Absolute path of the project to scope Cursor agent session extraction to.
+   * Matched against the Cursor per-project directory slug prefix, so a
+   * workspace root naturally captures cross-repo sessions. When omitted,
+   * Cursor activity is not included.
+   */
+  cursorProjectPath?: string;
+  /**
    * Absolute path to an iCalendar (`.ics`) export to read the day's meetings
    * from (PRD-0003 Phase 2). When omitted, calendar activity is not included.
    */
@@ -150,6 +152,13 @@ export interface DailyChronicleInput {
    * activity would be dropped. Use for legitimately-shrinking regenerations.
    */
   force?: boolean;
+  /**
+   * Do not persist a Chronicle for a day with zero collected activity, unless
+   * a prior Chronicle already exists for that day. Set by range operations
+   * (backfill, the catch-up sweep) so quiet days — weekends, vacations — never
+   * commit empty documents.
+   */
+  skipEmpty?: boolean;
 }
 
 /** The result of persisting a generated Chronicle to a repository. */

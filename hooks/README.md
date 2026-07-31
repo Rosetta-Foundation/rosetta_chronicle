@@ -26,9 +26,51 @@ team-setup also registers Cursor hooks in `~/.cursor/hooks.json`:
 - `stop` → `cursor-stop-append.sh` normalizes the Cursor payload and delegates to
   `stop-append.sh`
 
-Cursor transcripts are **not** Claude Code JSONL. Auto-append for Cursor is
-best-effort today; Chronicle will log a miss until a Cursor transcript adapter
-lands. Env wiring is ready either way.
+Cursor sessions are read by `CursorRepository` from two places:
+
+1. **Transcripts** — `~/.cursor/projects/<cwd-slug>/agent-transcripts/<session-id>/<session-id>.jsonl`
+2. **Session metadata** — `~/.cursor/chats/<md5-of-cwd>/<session-id>/meta.json`
+   (`title`, `createdAtMs`, `cwd`), when Cursor has written it
+
+The session title comes from `meta.json`; untitled sessions fall back to the
+first user prompt (unwrapped from Cursor's `<user_query>` envelope), truncated
+and flagged `[needs-review]`. The session timestamp comes from `createdAtMs`,
+falling back to the transcript file's birthtime — so a multi-day session is
+attributed to the day it started. `backfill` and `append-session` cover Claude
+Code and Cursor sessions in a single run. Because Cursor sessions belong to
+their creation day, `append-session` resolves that day from the session id and
+regenerates it — a stop event after midnight updates the right Chronicle.
+
+### Automatic catch-up sweep
+
+Live capture alone can never be complete: sessions can end without a stop
+event (closed window, crash, sleep), and Cursor writes session titles
+asynchronously, after capture. `chronicle-sweep.sh` closes both gaps. It is
+fired in the background by `cursor-session-start.sh` on every new Cursor
+session (throttled to one attempt per day) and re-runs `chronicle backfill`
+over a trailing window so recent days self-heal — late titles upgrade
+`[needs-review]` entries and orphaned sessions get picked up.
+
+The window is **marker-based, not fixed-size**, so any length of absence is
+covered: each sweep starts 2 days before the last *successful* sweep date and
+runs through today (first ever run: 7 days back). Return from a three-week
+vacation and the first session start sweeps the whole gap. Quiet days are
+never committed — backfill skips days with zero activity unless a Chronicle
+already exists for them.
+
+Sweep state lives in `~/.config/rosetta/`:
+
+| File                 | Purpose                                     |
+| -------------------- | ------------------------------------------- |
+| `last-sweep-success` | Date swept through on the last clean run    |
+| `last-sweep-attempt` | Date of the last attempt (daily throttle)   |
+| `sweep.log`          | Backfill output from each sweep             |
+
+The sweep is safe to run by hand at any time:
+
+```bash
+~/projects/rosetta/rosetta_chronicle/hooks/chronicle-sweep.sh
+```
 
 Both tools share `~/.config/rosetta/chronicle.env` written by team-setup.
 

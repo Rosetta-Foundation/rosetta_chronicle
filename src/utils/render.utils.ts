@@ -35,10 +35,7 @@ export const renderCommitsByRepo = (commits: Activity[]): string => {
   return [...groups.keys()]
     .sort()
     .map((repo) => {
-      const lines = groups
-        .get(repo)!
-        .map(renderCommitLine)
-        .join('\n');
+      const lines = groups.get(repo)!.map(renderCommitLine).join('\n');
       return `**${repo}**\n${lines}`;
     })
     .join('\n\n');
@@ -47,7 +44,7 @@ export const renderCommitsByRepo = (commits: Activity[]): string => {
 /** Render a manual-note Activity as a Markdown list item. */
 export const renderNoteLine = (a: Activity): string => `- ${a.summary}`;
 
-/** Render a single Claude session Activity as a Markdown list item. */
+/** Render a single agent-session Activity as a Markdown list item. */
 export const renderSessionLine = (a: Activity, stripMarker = false): string => {
   const summary = stripMarker
     ? a.summary.replace(NEEDS_REVIEW_MARKER, '').trim()
@@ -80,13 +77,21 @@ export const renderDailyChronicle = (
   for (const section of sections) {
     lines.push(`## ${section.heading}`);
     lines.push('');
-    lines.push(section.body.trim().length > 0 ? section.body.trim() : '_No activity recorded._');
+    lines.push(
+      section.body.trim().length > 0
+        ? section.body.trim()
+        : '_No activity recorded._',
+    );
     lines.push('');
   }
 
   lines.push('## Suggested Tags');
   lines.push('');
-  lines.push(tags.length > 0 ? tags.map((t) => `\`[${t}]\``).join(' ') : '_None inferred._');
+  lines.push(
+    tags.length > 0
+      ? tags.map((t) => `\`[${t}]\``).join(' ')
+      : '_None inferred._',
+  );
   lines.push('');
 
   return lines.join('\n');

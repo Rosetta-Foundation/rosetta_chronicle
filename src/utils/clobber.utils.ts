@@ -4,7 +4,7 @@ import { Activity } from '../types';
  * Pure helper for detecting a regeneration that would clobber prior activity.
  * No I/O, no DI. See PRD-0005.
  *
- * Derived activity (git commits, Claude sessions) is rebuilt from whatever
+ * Derived activity (git commits, agent sessions) is rebuilt from whatever
  * sources a run can currently see. A run that sees fewer sources than a prior
  * run — a narrow `--project` scope, a stale local checkout, an unreachable
  * transcript store — regenerates the day with less activity and would overwrite

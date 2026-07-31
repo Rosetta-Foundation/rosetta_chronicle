@@ -22,6 +22,11 @@ export interface DailyChronicleResult {
    * been dropped. When set, `persisted` is absent.
    */
   clobberPrevented?: ClobberCheck;
+  /**
+   * True when `skipEmpty` suppressed persistence because the day had no
+   * activity and no prior Chronicle. When set, `persisted` is absent.
+   */
+  skippedEmpty?: boolean;
 }
 
 /**
@@ -83,7 +88,12 @@ export class DailyChronicleHandler implements IDailyChronicleHandler {
     // rendered Chronicle. One-time migrate any notes that only exist in an older
     // rendered Chronicle, then fold in this run's inline notes.
     const notes = input.outputRepoPath
-      ? await this._resolveNotes(input.outputRepoPath, date, existingMarkdown, input.notes)
+      ? await this._resolveNotes(
+          input.outputRepoPath,
+          date,
+          existingMarkdown,
+          input.notes,
+        )
       : input.notes;
 
     const chronicle = await this._chronicleService.generateDailyChronicle({
@@ -97,12 +107,27 @@ export class DailyChronicleHandler implements IDailyChronicleHandler {
       return { chronicle };
     }
 
+    // Quiet-day suppression: range operations (backfill, sweep) must not
+    // commit empty documents for weekends or vacations. A day that already
+    // has a Chronicle still regenerates normally.
+    if (
+      input.skipEmpty &&
+      chronicle.data.activities.length === 0 &&
+      !priorData &&
+      !existingMarkdown
+    ) {
+      return { chronicle, skippedEmpty: true };
+    }
+
     // Clobber guard (PRD-0005): if a prior sidecar exists and this run would drop
     // activity it captured — with nothing new to offset the loss — refuse to
     // overwrite unless forced. Protects derived git/session activity the way
     // PRD-0003 protects notes. Compares against the sidecar (source of truth).
     if (priorData && !input.force) {
-      const clobber = checkClobber(chronicle.data.activities, priorData.activities);
+      const clobber = checkClobber(
+        chronicle.data.activities,
+        priorData.activities,
+      );
       if (clobber.wouldClobber) {
         return { chronicle, clobberPrevented: clobber };
       }
@@ -134,7 +159,11 @@ export class DailyChronicleHandler implements IDailyChronicleHandler {
     if (existingMarkdown) {
       const priorNotes = parseExistingNotes(existingMarkdown);
       if (priorNotes.length > 0) {
-        await this._notesStore.appendDaily(repoPath, date, priorNotes.join('\n'));
+        await this._notesStore.appendDaily(
+          repoPath,
+          date,
+          priorNotes.join('\n'),
+        );
       }
     }
 

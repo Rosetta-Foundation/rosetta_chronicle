@@ -5,9 +5,9 @@
 # ~/.config/rosetta/chronicle.env, normalizes the Cursor stdin payload into the
 # shape chronicle append-session expects, then delegates to stop-append.sh.
 #
-# Cursor transcripts are not Claude Code JSONL. append-session may no-op or
-# log a miss until Chronicle gains a Cursor transcript adapter — that is OK;
-# this hook must never block the agent loop.
+# Cursor sessions are ingested by CursorRepository (transcripts under
+# ~/.cursor/projects/, session metadata under ~/.cursor/chats/). Capture is
+# still best-effort: this hook must never block the agent loop.
 
 set -euo pipefail
 
