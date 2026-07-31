@@ -9,9 +9,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # Node is still the runtime for jest and the built CLI; Bun is the
+      # package manager.
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
-      - run: yarn install --frozen-lockfile
-      - run: yarn build
-      - run: yarn test
+          node-version: 22
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install --frozen-lockfile
+      - run: bun run build
+      - run: bun run test
