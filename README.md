@@ -50,3 +50,7 @@ across Rosetta. See the workspace rule at `../.claude/rules/architecture-hsr.md`
 [`CLAUDE.md`](CLAUDE.md).
 
 > Chronicle is the memory. Wayfinder is the guide.
+
+## License
+
+[Apache-2.0](LICENSE) — Copyright 2026 Rosetta Foundation.

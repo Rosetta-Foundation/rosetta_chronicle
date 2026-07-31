@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "Transforms engineering activity into durable organizational knowledge.",
-  "license": "UNLICENSED",
+  "license": "Apache-2.0",
   "main": "dist/index.js",
   "bin": {
     "chronicle": "./dist/bin/cli.js"
