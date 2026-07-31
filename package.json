@@ -1,0 +1,30 @@
+{
+  "name": "rosetta_chronicle",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Transforms engineering activity into durable organizational knowledge.",
+  "license": "UNLICENSED",
+  "main": "dist/index.js",
+  "bin": {
+    "chronicle": "./dist/bin/cli.js"
+  },
+  "scripts": {
+    "build": "tsc && chmod +x dist/bin/cli.js",
+    "dev": "ts-node src/bin/cli.ts",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage"
+  },
+  "dependencies": {
+    "inversify": "^7.0.0",
+    "reflect-metadata": "^0.2.0"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@types/node": "^24.3.0",
+    "jest": "^30.4.2",
+    "ts-jest": "^29.4.11",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.2"
+  }
+}
