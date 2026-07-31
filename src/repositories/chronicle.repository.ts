@@ -3,6 +3,18 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import path from 'path';
 import { injectable } from 'inversify';
 import { DailyChronicle, PersistedChronicle } from '../types';
+import {
+  dailyLedgerCommitSubject,
+  dailyLedgerCommitTrailers,
+} from '../utils/commit.utils';
+
+// Engine version for the Generated-By trailer, resolved from this package's
+// manifest (…/dist/repositories → …/package.json; same shape under src in jest).
+const ENGINE_VERSION = (
+  JSON.parse(
+    readFileSync(path.join(__dirname, '..', '..', 'package.json'), 'utf-8'),
+  ) as { version: string }
+).version;
 
 /**
  * Persistence adapter for generated Chronicles. Resource access only — writes
@@ -11,7 +23,10 @@ import { DailyChronicle, PersistedChronicle } from '../types';
  */
 export interface IChronicleRepository {
   /** Write `chronicle` into `repoPath` and commit it. */
-  persistDaily(repoPath: string, chronicle: DailyChronicle): Promise<PersistedChronicle>;
+  persistDaily(
+    repoPath: string,
+    chronicle: DailyChronicle,
+  ): Promise<PersistedChronicle>;
   /** Read the raw Markdown of an existing Chronicle for `date` (YYYY-MM-DD), or null if absent. */
   readDaily(repoPath: string, date: string): Promise<string | null>;
 }
@@ -72,6 +87,10 @@ export class ChronicleRepository implements IChronicleRepository {
    *
    * Scopes the commit to exactly `relPaths` via `--only`, so it never sweeps in
    * unrelated working-tree changes in the personal Chronicle repo.
+   *
+   * The message is a machine-authored ledger commit per ADR-0007:
+   * `chronicle(daily): <date>` with `Chronicle-Window:` and `Generated-By:`
+   * provenance trailers.
    */
   private _commit(repoPath: string, relPaths: string[], date: string): boolean {
     if (relPaths.length === 0) return false;
@@ -86,7 +105,9 @@ export class ChronicleRepository implements IChronicleRepository {
           repoPath,
           'commit',
           '-m',
-          `chore: daily chronicle ${date}`,
+          dailyLedgerCommitSubject(date),
+          '-m',
+          dailyLedgerCommitTrailers(date, ENGINE_VERSION),
           '--only',
           ...relPaths,
         ],

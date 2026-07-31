@@ -1,5 +1,12 @@
 import { execFileSync } from 'child_process';
-import { mkdtempSync, mkdirSync, rmSync, readFileSync, existsSync, writeFileSync } from 'fs';
+import {
+  mkdtempSync,
+  mkdirSync,
+  rmSync,
+  readFileSync,
+  existsSync,
+  writeFileSync,
+} from 'fs';
 import { tmpdir } from 'os';
 import path from 'path';
 import { ChronicleRepository } from '../repositories/chronicle.repository';
@@ -16,7 +23,11 @@ const chronicle = (markdown: string): DailyChronicle => ({
   sections: [],
   tags: [],
   markdown,
-  data: { window: { start: '2026-07-22', end: '2026-07-22' }, tags: [], activities: [] },
+  data: {
+    window: { start: '2026-07-22', end: '2026-07-22' },
+    tags: [],
+    activities: [],
+  },
 });
 
 describe('ChronicleRepository.readDaily', () => {
@@ -55,7 +66,10 @@ describe('ChronicleRepository.persistDaily', () => {
 
   it('writes the markdown to chronicles/<date>.md and commits it', async () => {
     const repo = new ChronicleRepository();
-    const result = await repo.persistDaily(repoDir, chronicle('# Daily Chronicle\n\nhello'));
+    const result = await repo.persistDaily(
+      repoDir,
+      chronicle('# Daily Chronicle\n\nhello'),
+    );
 
     const expectedPath = path.join(repoDir, 'chronicles', '2026-07-22.md');
     expect(result.path).toBe(expectedPath);
@@ -63,8 +77,19 @@ describe('ChronicleRepository.persistDaily', () => {
     expect(existsSync(expectedPath)).toBe(true);
     expect(readFileSync(expectedPath, 'utf-8')).toContain('# Daily Chronicle');
 
-    const log = git(repoDir, ['log', '--oneline']);
-    expect(log).toContain('daily chronicle 2026-07-22');
+    // Machine-authored ledger commit per ADR-0007: chronicle(daily) subject
+    // plus mandatory provenance trailers.
+    const message = git(repoDir, ['log', '-1', '--format=%B']);
+    expect(message).toContain('chronicle(daily): 2026-07-22');
+    expect(message).toContain('Chronicle-Window: 2026-07-22');
+    expect(message).toMatch(/Generated-By: chronicle@\d+\.\d+\.\d+/);
+
+    // The trailers parse as real git trailers, not just body text.
+    const trailers = execFileSync('git', ['interpret-trailers', '--parse'], {
+      input: message,
+      encoding: 'utf-8',
+    });
+    expect(trailers).toContain('Chronicle-Window: 2026-07-22');
   });
 
   it('overwrites an existing chronicle on a repeat run (idempotent path/name)', async () => {

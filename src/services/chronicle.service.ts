@@ -9,6 +9,7 @@ import {
   Evidence,
 } from '../types';
 import { inferTags, ALL_TAGS } from '../utils/tags.utils';
+import { isChronicleLedgerCommit } from '../utils/commit.utils';
 import {
   renderDailyChronicle,
   renderCommitLine,
@@ -145,10 +146,14 @@ export class ChronicleService implements IChronicleService {
    * Resolve the set of git repositories in scope, then aggregate their in-window
    * commit activity. When `workspaceRoot` is set, every repository discovered
    * under it is included (unioned with an explicit `gitRepoPath`); otherwise
-   * only `gitRepoPath` is queried. The Chronicle output repo is excluded, so the
-   * Chronicle's own `chore: daily chronicle` commits never pollute Work
-   * Completed. Orchestration lives here — discovery and per-repo querying are
-   * separate repositories.
+   * only `gitRepoPath` is queried.
+   *
+   * Self-exclusion is protocol, not path-matching (ADR-0007): commits whose
+   * subject carries the `chronicle:` type (or the legacy
+   * `chore: daily chronicle` subject) are machine-authored ledger writes and
+   * are never ingested, wherever they live. Skipping the Chronicle output repo
+   * during discovery remains as an optimization. Orchestration lives here —
+   * discovery and per-repo querying are separate repositories.
    */
   private async _collectGitActivity(
     input: DailyChronicleInput,
@@ -165,8 +170,8 @@ export class ChronicleService implements IChronicleService {
       for (const p of discovered) repoPaths.add(p);
     }
 
-    // Exclude the Chronicle output repo — its commits are Chronicle writing to
-    // itself, not engineering work. An explicit gitRepoPath is honored (the
+    // Skip the Chronicle output repo during discovery — an optimization on top
+    // of the message-based rule below. An explicit gitRepoPath is honored (the
     // caller asked for it); only discovered repos are filtered.
     const outputRepo = input.outputRepoPath
       ? path.resolve(input.outputRepoPath)
@@ -184,8 +189,12 @@ export class ChronicleService implements IChronicleService {
       ),
     );
 
+    // The self-exclusion invariant (ADR-0007): machine-authored ledger commits
+    // are Chronicle writing to itself, never engineering work — drop them by
+    // commit type, regardless of which repository they were found in.
     return perRepo
       .flat()
+      .filter((a) => !isChronicleLedgerCommit(a.summary))
       .sort((a, b) => a.timestamp.localeCompare(b.timestamp));
   }
 
