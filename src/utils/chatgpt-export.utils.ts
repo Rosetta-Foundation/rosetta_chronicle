@@ -84,9 +84,9 @@ const bump = (counts: Record<string, number>, key: string): void => {
 /**
  * Whether a `metadata.attachments[].id` has a corresponding archive file.
  *
- * In the inventoried OpenAI export the authoritative mapping is:
- * `attachment.id` → `{id}.dat` in the zip/directory listing (322 of 337
- * ids in the 2026-08-16 export; the other 15 have no blob).
+ * In inventoried OpenAI exports the authoritative mapping is:
+ * `attachment.id` → `{id}.dat` in the zip/directory listing. Some ids have
+ * no blob; those are missing, not a mapping miss.
  *
  * `conversation_asset_file_names.json` maps that `.dat` name to a display
  * filename — it is not the presence index. `library_files.json` is a

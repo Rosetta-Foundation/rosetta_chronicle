@@ -94,25 +94,23 @@ describe('chatgpt-export.utils', () => {
   });
 
   it('treats attachment.id + ".dat" as the archive presence mapping', () => {
-    // Real export: 322/337 metadata.attachments[].id values are present
-    // iff the zip lists `{id}.dat`. Display names and library catalog
-    // rows are not archive keys.
+    // Contract: metadata.attachments[].id is present iff the archive lists
+    // `{id}.dat`. Display names and library catalog rows are not archive keys.
     const archive = [
-      'file-1f2XEsD34dV21EJ82cnQ17Rg.dat',
+      'file-fixture-present.dat',
       'conversations-000.json',
       'conversation_asset_file_names.json',
       'library_files.json',
     ];
     expect(
-      attachmentPresentInArchive(
-        'file-1f2XEsD34dV21EJ82cnQ17Rg',
-        archive,
-      ),
+      attachmentPresentInArchive('file-fixture-present', archive),
     ).toBe(true);
     expect(
       attachmentPresentInArchive('file-missing-from-archive', archive),
     ).toBe(false);
-    expect(attachmentPresentInArchive('IMG_3685.jpeg', archive)).toBe(false);
+    expect(
+      attachmentPresentInArchive('original-display-name.jpeg', archive),
+    ).toBe(false);
     expect(attachmentPresentInArchive('libfile_catalog_only', archive)).toBe(
       false,
     );
