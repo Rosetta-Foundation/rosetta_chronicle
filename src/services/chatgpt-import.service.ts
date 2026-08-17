@@ -6,17 +6,18 @@ import type { IChatGptGraphStore } from '../repositories/chatgpt-graph-store.rep
 import { buildSourceGraph } from '../utils/chatgpt-export.utils';
 
 /**
- * Orchestrates ChatGPT source-graph import into a personal Chronicle repo.
+ * Orchestrates ChatGPT source-graph import into a caller-chosen directory.
  *
  * Builds the normalized conversation graph from a stripped export and
  * persists it keyed by archive content hash. Re-import of the same hash
  * is a no-op and keeps the original `importedAt`. Does not emit Activity,
- * does not write Daily Chronicles, and does not copy source bytes.
+ * does not write Daily Chronicles, and does not copy source bytes. The
+ * output directory is configuration, not an engine layout.
  */
 export interface IChatGptImportService {
   importGraph(
     exportPath: string,
-    repoPath: string,
+    outputDir: string,
     importedAt: string,
     dryRun: boolean,
   ): Promise<ChatGptImportResult>;
@@ -42,7 +43,7 @@ export class ChatGptImportService implements IChatGptImportService {
   /** @inheritDoc */
   async importGraph(
     exportPath: string,
-    repoPath: string,
+    outputDir: string,
     importedAt: string,
     dryRun: boolean,
   ): Promise<ChatGptImportResult> {
@@ -57,27 +58,27 @@ export class ChatGptImportService implements IChatGptImportService {
     }
 
     const existing = await this._graphStore.read(
-      repoPath,
+      outputDir,
       read.export.contentHash,
     );
     if (existing && existing.archive.contentHash === read.export.contentHash) {
       return this.toResult(
         'already-present',
         existing,
-        this._graphStore.pathFor(repoPath, existing.archive.contentHash),
+        this._graphStore.pathFor(outputDir, existing.archive.contentHash),
       );
     }
 
     const graph = buildSourceGraph(read.export, importedAt);
     const intended = this._graphStore.pathFor(
-      repoPath,
+      outputDir,
       graph.archive.contentHash,
     );
     if (dryRun) {
       return this.toResult('imported', graph, intended);
     }
 
-    const written = await this._graphStore.write(repoPath, graph);
+    const written = await this._graphStore.write(outputDir, graph);
     return this.toResult('imported', graph, written);
   }
 

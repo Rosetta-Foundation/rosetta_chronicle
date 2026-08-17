@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 import { Container } from 'inversify';
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 
@@ -31,7 +31,7 @@ describe('ChatGptImportService', () => {
   let service: {
     importGraph: (
       exportPath: string,
-      repoPath: string,
+      outputDir: string,
       importedAt: string,
       dryRun: boolean,
     ) => Promise<Record<string, unknown>>;
@@ -57,15 +57,7 @@ describe('ChatGptImportService', () => {
     expect(result.importedAt).toBe(IMPORTED);
     expect(result.conversationCount).toBe(9);
     expect(typeof result.contentHash).toBe('string');
-    expect(result.path).toBe(
-      join(
-        repoDir,
-        'chronicles',
-        '.data',
-        'chatgpt-export',
-        `${result.contentHash}.json`,
-      ),
-    );
+    expect(result.path).toBe(join(repoDir, `${result.contentHash}.json`));
 
     const dumped = readFileSync(result.path as string, 'utf-8');
     for (const leak of LEAKS) {
@@ -78,9 +70,9 @@ describe('ChatGptImportService', () => {
       `${IMPORTED.slice(0, 10)}.md`,
     );
     expect(existsSync(dailyMd)).toBe(false);
-    expect(readdirSync(join(repoDir, 'chronicles', '.data'))).toEqual([
-      'chatgpt-export',
-    ]);
+    expect(
+      existsSync(join(repoDir, 'chronicles', '.data', 'chatgpt-export')),
+    ).toBe(false);
 
     const graph = JSON.parse(dumped);
     const byId = Object.fromEntries(

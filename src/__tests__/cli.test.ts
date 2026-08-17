@@ -61,14 +61,17 @@ describe('chronicle CLI', () => {
     expect(result.stderr).toContain('--export');
   });
 
-  it('import-chatgpt exits 1 without --repo', () => {
+  it('import-chatgpt exits 1 without --output', () => {
     const result = spawnSync(
       process.execPath,
       [CLI, 'import-chatgpt', '--export', '/tmp/no-such-chatgpt-export'],
-      { encoding: 'utf-8', env: { ...process.env, CHRONICLE_REPO: undefined } },
+      {
+        encoding: 'utf-8',
+        env: { ...process.env, CHRONICLE_SOURCE_GRAPH_DIR: undefined },
+      },
     );
     expect(result.status).toBe(1);
-    expect(result.stderr).toContain('--repo');
+    expect(result.stderr).toContain('--output');
   });
 
   it('inventory-chatgpt prints JSON for a missing export', () => {
@@ -98,7 +101,7 @@ describe('chronicle CLI', () => {
           'import-chatgpt',
           '--export',
           fixture,
-          '--repo',
+          '--output',
           repo,
           '--dry-run',
         ],
@@ -123,7 +126,7 @@ describe('chronicle CLI', () => {
     try {
       const result = spawnSync(
         process.execPath,
-        [CLI, 'import-chatgpt', '--export', fixture, '--repo', repo],
+        [CLI, 'import-chatgpt', '--export', fixture, '--output', repo],
         { encoding: 'utf-8' },
       );
       expect(result.status).toBe(0);

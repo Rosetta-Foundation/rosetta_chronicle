@@ -36,7 +36,7 @@ Usage:
   chronicle backfill [options]
   chronicle append-session [options]
   chronicle inventory-chatgpt --export <path>
-  chronicle import-chatgpt --export <path> --repo <path> [--dry-run]
+  chronicle import-chatgpt --export <path> --output <dir> [--dry-run]
   chronicle queue [show] [--repo <path>]
   chronicle queue add "<title>" [--jira KEY] [--prd NNNN/N] [--due DATE] [--repo <path>]
   chronicle queue done "<title-or-id>" [--repo <path>]
@@ -55,8 +55,8 @@ Commands:
     list              List all items in a state.
   inventory-chatgpt   Read-only inventory of a ChatGPT export directory or
                       zip. Prints JSON. Does not write a Chronicle.
-  import-chatgpt      Persist a stripped conversation graph into a personal
-                      Chronicle repo. Idempotent by archive content hash.
+  import-chatgpt      Persist a stripped conversation graph to --output as
+                      a content-hash JSON file. Idempotent by archive hash.
                       Does not emit Activity or write a Daily Chronicle.
 
 Options:
@@ -80,12 +80,18 @@ Options:
   --state <state>     Filter queue list by state (active|next|inbox|done).
   --export <path>     ChatGPT export directory or .zip
                       (inventory-chatgpt, import-chatgpt).
+  --output <dir>      Directory for import-chatgpt content-hash JSON files.
+                      Caller-chosen; the engine does not assume a personal
+                      Chronicle layout. Falls back to
+                      $CHRONICLE_SOURCE_GRAPH_DIR.
   -h, --help          Show this help.
 
 Environment variables:
   CHRONICLE_REPO      Default value for --repo.
   CHRONICLE_PROJECT   Default value for --project.
   CHRONICLE_CALENDAR  Default value for --calendar (path to .ics export).
+  CHRONICLE_SOURCE_GRAPH_DIR
+                      Default value for import-chatgpt --output.
 `.trim();
 
 interface ParsedArgs {
@@ -107,6 +113,7 @@ interface ParsedArgs {
   due?: string;
   state?: QueueState;
   exportPath?: string;
+  outputDir?: string;
 }
 
 function parseArgs(argv: string[]): ParsedArgs {
@@ -186,6 +193,9 @@ function parseArgs(argv: string[]): ParsedArgs {
         break;
       case '--export':
         result.exportPath = args[++i];
+        break;
+      case '--output':
+        result.outputDir = args[++i];
         break;
       case '-h':
       case '--help':
@@ -547,13 +557,15 @@ async function runInventoryChatgpt(args: ParsedArgs): Promise<void> {
 async function runImportChatgpt(args: ParsedArgs): Promise<void> {
   const exportPath = args.exportPath;
   if (!exportPath) die('--export <path> is required for import-chatgpt');
-  const repo = args.repo ?? process.env['CHRONICLE_REPO'];
-  if (!repo)
-    die('--repo <path> (or $CHRONICLE_REPO) is required for import-chatgpt');
+  const outputDir = args.outputDir ?? process.env['CHRONICLE_SOURCE_GRAPH_DIR'];
+  if (!outputDir)
+    die(
+      '--output <dir> (or $CHRONICLE_SOURCE_GRAPH_DIR) is required for import-chatgpt',
+    );
   const handler = getChatGptImportHandler();
   const result = await handler.handle({
     exportPath,
-    repoPath: repo,
+    outputDir,
     dryRun: args.dryRun,
   });
   console.log(JSON.stringify(result, null, 2));

@@ -33,7 +33,7 @@ export class ChatGptImportHandler implements IChatGptImportHandler {
     const importedAt = input.ingestedAt ?? new Date().toISOString();
     return this._importService.importGraph(
       input.exportPath,
-      input.repoPath,
+      input.outputDir,
       importedAt,
       input.dryRun === true,
     );

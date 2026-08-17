@@ -405,8 +405,11 @@ export interface ChatGptSourceGraph {
 /** Input to the ChatGPT source-graph import handler. */
 export interface ChatGptImportInput {
   exportPath: string;
-  /** Absolute path to the personal Chronicle repository. */
-  repoPath: string;
+  /**
+   * Directory that will hold `<contentHash>.json`. Caller-chosen — the
+   * engine does not encode a personal Chronicle layout.
+   */
+  outputDir: string;
   ingestedAt?: string;
   /** Build the graph and do not write. */
   dryRun?: boolean;

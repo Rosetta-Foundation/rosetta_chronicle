@@ -49,18 +49,15 @@ describe('ChatGptGraphStore', () => {
     expect(await store.read(repoDir, HASH)).toBeNull();
   });
 
-  it('round-trips a graph under chronicles/.data/chatgpt-export/<hash>.json', async () => {
+  it('round-trips a graph as <outputDir>/<hash>.json with no extra layout', async () => {
     const store = new ChatGptGraphStore();
     const written = await store.write(repoDir, graph('2026-08-17T21:00:00.000Z'));
-    const expected = path.join(
-      repoDir,
-      'chronicles',
-      '.data',
-      'chatgpt-export',
-      `${HASH}.json`,
-    );
+    const expected = path.join(repoDir, `${HASH}.json`);
     expect(written).toBe(expected);
     expect(existsSync(expected)).toBe(true);
+    expect(
+      existsSync(path.join(repoDir, 'chronicles', '.data', 'chatgpt-export')),
+    ).toBe(false);
     const read = await store.read(repoDir, HASH);
     expect(read?.archive.importedAt).toBe('2026-08-17T21:00:00.000Z');
     expect(read?.conversations[0].sourceId).toBe('c1');

@@ -19,14 +19,14 @@ describe('ChatGptImportHandler', () => {
     const handler = container.get<{
       handle: (input: {
         exportPath: string;
-        repoPath: string;
+        outputDir: string;
       }) => Promise<unknown>;
     }>(CHRONICLE_TOKENS.ChatGptImportHandler);
 
-    await handler.handle({ exportPath: '/export', repoPath: '/repo' });
+    await handler.handle({ exportPath: '/export', outputDir: '/graphs' });
     expect(mockService.importGraph).toHaveBeenCalledWith(
       '/export',
-      '/repo',
+      '/graphs',
       expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
       false,
     );
@@ -44,7 +44,7 @@ describe('ChatGptImportHandler', () => {
     const handler = container.get<{
       handle: (input: {
         exportPath: string;
-        repoPath: string;
+        outputDir: string;
         ingestedAt: string;
         dryRun: boolean;
       }) => Promise<unknown>;
@@ -52,13 +52,13 @@ describe('ChatGptImportHandler', () => {
 
     await handler.handle({
       exportPath: '/export',
-      repoPath: '/repo',
+      outputDir: '/graphs',
       ingestedAt: '2026-08-17T21:00:00.000Z',
       dryRun: true,
     });
     expect(mockService.importGraph).toHaveBeenCalledWith(
       '/export',
-      '/repo',
+      '/graphs',
       '2026-08-17T21:00:00.000Z',
       true,
     );

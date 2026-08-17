@@ -4,13 +4,28 @@
 **Date:** 2026-08-17
 
 Phase 1 inventories a ChatGPT export without writing Chronicle records.
-Phase 2 persists the **normalized conversation graph** into the owner's
-personal Chronicle repository. It does not interpret the graph, project
-`Activity`, or touch Daily Chronicle synthesis.
+Phase 2 persists the **normalized conversation graph** to a caller-chosen
+directory. It does not interpret the graph, project `Activity`, or touch
+Daily Chronicle synthesis.
 
 ```
-chronicle import-chatgpt --export <dir-or-zip> --repo <personal-chronicle>
+chronicle import-chatgpt --export <dir-or-zip> --output <dir>
 ```
+
+`--output` is configuration. The engine writes `<output>/<contentHash>.json`
+and does not encode a personal Chronicle layout. A personal Chronicle may
+choose a convention such as `chronicles/.data/chatgpt-export/` and pass that
+directory (or set `CHRONICLE_SOURCE_GRAPH_DIR`); that choice lives in the
+target repository, not in this engine.
+
+## Not an archive backup
+
+The persisted file is a durable representation of **source structure**
+(ids, topology, clocks, roles/types, attachment presence). It is not a
+replacement or backup of the original export. Archive bytes, message text,
+titles, display filenames, and attachment blobs stay outside this record.
+Losing the export still loses the content; the graph only preserves the
+path's shape so it can be replayed later against the source.
 
 ## Why this is not Activity
 
@@ -42,7 +57,7 @@ undecided. Identity is the archive content hash.
 
 ## Schema
 
-Persisted at `chronicles/.data/chatgpt-export/<contentHash>.json`.
+Persisted at `<outputDir>/<contentHash>.json`.
 
 ```ts
 interface ChatGptSourceGraph {
