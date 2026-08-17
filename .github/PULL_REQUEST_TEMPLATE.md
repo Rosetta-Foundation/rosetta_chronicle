@@ -20,6 +20,7 @@
 - [ ] `yarn build` passes
 - [ ] `yarn test` passes (all tests green)
 - [ ] Manually exercised the changed behaviour
+- [ ] Documentation matches this change (see `docs/documentation-sync.md`)
 
 ---
 🤖 Generated with [Claude Code](https://claude.com/claude-code)

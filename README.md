@@ -27,7 +27,8 @@ downstream product.
 
 See [`docs/architecture.md`](docs/architecture.md) for the full architecture and design principles,
 [`docs/chronicle-overview.md`](docs/chronicle-overview.md) for the Chronicle overview, and [`docs/mvp.md`](docs/mvp.md) for the
-v0.1 scope.
+v0.1 scope. Keep those documents synchronized with the engine — see
+[`docs/documentation-sync.md`](docs/documentation-sync.md).
 
 ## MVP — v0.1 Daily Chronicle
 
