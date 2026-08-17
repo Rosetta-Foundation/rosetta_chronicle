@@ -43,6 +43,7 @@ describe('chronicle CLI', () => {
     expect(result.stdout).toContain('append-session');
     expect(result.stdout).toContain('inventory-chatgpt');
     expect(result.stdout).toContain('import-chatgpt');
+    expect(result.stdout).toContain('record-derived');
   });
 
   it('inventory-chatgpt exits 1 without --export', () => {
@@ -137,6 +138,58 @@ describe('chronicle CLI', () => {
       expect(dumped).not.toContain('SYNTHETIC_TITLE_MUST_NOT_LEAK');
     } finally {
       rmSync(repo, { recursive: true, force: true });
+    }
+  });
+
+  it('record-derived exits 1 without --output', () => {
+    const result = spawnSync(
+      process.execPath,
+      [CLI, 'record-derived', '--source-graph-hash', 'a'.repeat(64)],
+      {
+        encoding: 'utf-8',
+        env: { ...process.env, CHRONICLE_DERIVED_DIR: undefined },
+      },
+    );
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('--output');
+  });
+
+  it('record-derived writes a synthetic note without Daily Chronicle files', () => {
+    const out = mkdtempSync(join(tmpdir(), 'cli-derived-'));
+    try {
+      const result = spawnSync(
+        process.execPath,
+        [
+          CLI,
+          'record-derived',
+          '--output',
+          out,
+          '--source-graph-hash',
+          'a'.repeat(64),
+          '--conversation-id',
+          'conv-1',
+          '--node-id',
+          'n1',
+          '--type',
+          'human-note',
+          '--producer-type',
+          'human',
+          '--producer-name',
+          'fixture',
+          '--content',
+          'SYNTHETIC_DERIVED_NOTE',
+        ],
+        { encoding: 'utf-8' },
+      );
+      expect(result.status).toBe(0);
+      const parsed = JSON.parse(result.stdout);
+      expect(parsed.status).toBe('recorded');
+      expect(existsSync(parsed.path)).toBe(true);
+      expect(readFileSync(parsed.path, 'utf-8')).toContain(
+        'SYNTHETIC_DERIVED_NOTE',
+      );
+    } finally {
+      rmSync(out, { recursive: true, force: true });
     }
   });
 

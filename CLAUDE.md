@@ -39,6 +39,7 @@ src/
 ├── daily-chronicle.handler.ts   IDailyChronicleHandler / DailyChronicleHandler
 ├── chatgpt-inventory.handler.ts IChatGptInventoryHandler (PRD-0027 Phase 1)
 ├── chatgpt-import.handler.ts    IChatGptImportHandler (PRD-0027 Phase 2)
+├── derived-record.handler.ts    IDerivedRecordHandler (PRD-0027 derived records)
 ├── services/
 │   └── chronicle.service.ts     IChronicleService — synthesize sources → DailyChronicle
 ├── repositories/                one per source (interface + stub impl)
