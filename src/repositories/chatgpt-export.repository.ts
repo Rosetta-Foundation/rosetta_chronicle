@@ -31,6 +31,8 @@ export interface IChatGptExportRepository {
 }
 
 const CONVERSATION_SHARD = /^conversations(?:-\d+)?\.json$/;
+/** Real export shards exceed Node's 1 MiB default spawn buffer. */
+const UNZIP_MAX_BUFFER = 64 * 1024 * 1024;
 
 /**
  * Filesystem implementation of {@link IChatGptExportRepository}.
@@ -176,6 +178,7 @@ export class ChatGptExportRepository implements IChatGptExportRepository {
   private unzipNames(zipPath: string): string[] {
     const out = execFileSync('unzip', ['-Z', '-1', zipPath], {
       encoding: 'utf8',
+      maxBuffer: UNZIP_MAX_BUFFER,
     });
     return out
       .split('\n')
@@ -184,6 +187,8 @@ export class ChatGptExportRepository implements IChatGptExportRepository {
   }
 
   private unzipFile(zipPath: string, entry: string): Buffer {
-    return execFileSync('unzip', ['-p', zipPath, entry]);
+    return execFileSync('unzip', ['-p', zipPath, entry], {
+      maxBuffer: UNZIP_MAX_BUFFER,
+    });
   }
 }
