@@ -1,4 +1,5 @@
 import {
+  attachmentPresentInArchive,
   buildInventory,
   partShape,
   reconstructChildIds,
@@ -90,6 +91,31 @@ describe('chatgpt-export.utils', () => {
       'SYNTHETIC_TITLE_MUST_NOT_LEAK',
     );
     expect(stripped.nodes[0].partShapes).toEqual([{ kind: 'string' }]);
+  });
+
+  it('treats attachment.id + ".dat" as the archive presence mapping', () => {
+    // Real export: 322/337 metadata.attachments[].id values are present
+    // iff the zip lists `{id}.dat`. Display names and library catalog
+    // rows are not archive keys.
+    const archive = [
+      'file-1f2XEsD34dV21EJ82cnQ17Rg.dat',
+      'conversations-000.json',
+      'conversation_asset_file_names.json',
+      'library_files.json',
+    ];
+    expect(
+      attachmentPresentInArchive(
+        'file-1f2XEsD34dV21EJ82cnQ17Rg',
+        archive,
+      ),
+    ).toBe(true);
+    expect(
+      attachmentPresentInArchive('file-missing-from-archive', archive),
+    ).toBe(false);
+    expect(attachmentPresentInArchive('IMG_3685.jpeg', archive)).toBe(false);
+    expect(attachmentPresentInArchive('libfile_catalog_only', archive)).toBe(
+      false,
+    );
   });
 
   it('marks non-object mapping entries as malformed', () => {

@@ -20,12 +20,11 @@ export type ActivitySource =
   | 'claude-code'
   | 'cursor'
   | 'notes'
-  | 'calendar'
-  | 'chatgpt-export';
+  | 'calendar';
 
-// future: 'github' | 'slack' | 'confluence'
-// `chatgpt-export` is Phase 1 inventory-aware only — Daily Chronicle
-// synthesis does not collect it (PRD-0027).
+// future: 'github' | 'slack' | 'confluence' | 'chatgpt-export'
+// `chatgpt-export` is not a member until import emits Activity (PRD-0027).
+// Phase 1 inventory is a read-only command, not an activity source.
 /** The Rosetta tag taxonomy (see docs/mvp.md). */
 export type Tag =
   | 'DELIVERY'

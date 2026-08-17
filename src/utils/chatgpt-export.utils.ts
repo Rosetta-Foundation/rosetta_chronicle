@@ -81,9 +81,24 @@ const bump = (counts: Record<string, number>, key: string): void => {
   counts[key] = (counts[key] ?? 0) + 1;
 };
 
-const isKnownFile = (name: string, archiveFiles: string[]): boolean => {
-  const base = name.split('/').pop() ?? name;
-  const candidates = new Set([name, base, `${base}.dat`]);
+/**
+ * Whether a `metadata.attachments[].id` has a corresponding archive file.
+ *
+ * In the inventoried OpenAI export the authoritative mapping is:
+ * `attachment.id` → `{id}.dat` in the zip/directory listing (322 of 337
+ * ids in the 2026-08-16 export; the other 15 have no blob).
+ *
+ * `conversation_asset_file_names.json` maps that `.dat` name to a display
+ * filename — it is not the presence index. `library_files.json` is a
+ * separate catalog (`library_file_id` / nested library `id`); a catalog
+ * row does not mean the blob is in the archive.
+ */
+export const attachmentPresentInArchive = (
+  attachmentId: string,
+  archiveFiles: string[],
+): boolean => {
+  const base = attachmentId.split('/').pop() ?? attachmentId;
+  const candidates = new Set([attachmentId, base, `${base}.dat`]);
   return archiveFiles.some((f) => {
     const fileBase = f.split('/').pop() ?? f;
     return candidates.has(f) || candidates.has(fileBase);
@@ -176,7 +191,9 @@ export const buildInventory = (
         convAttachments++;
         attachmentRefCount++;
         const id = ref.id;
-        const present = id ? isKnownFile(id, raw.archiveFiles) : false;
+        const present = id
+          ? attachmentPresentInArchive(id, raw.archiveFiles)
+          : false;
         if (present) attachmentsPresent++;
         else {
           attachmentsMissing++;

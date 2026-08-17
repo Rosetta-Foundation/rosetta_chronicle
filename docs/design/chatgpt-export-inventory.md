@@ -68,11 +68,38 @@ The PRD types remain the Phase 2 target. Phase 1 revises them as follows:
 5. **Titles are source content.** Default inventory does not emit them.
    `ConversationArtifact.title` stays optional and must not be required for
    topology.
-6. **`chatgpt-export` is an `ActivitySource`.** Daily Chronicle synthesis does
-   not collect it. Phase 2 may project personal-domain activity from the
-   normalized graph; that is a later, explicit import.
+6. **Do not add `chatgpt-export` to `ActivitySource` in Phase 1.** That union
+   is the `source` field on `Activity` / `Evidence`. Inventory does not emit
+   either. Leave `chatgpt-export` as a `// future:` comment until import
+   actually produces activity (PRD-0027 Phase 2).
 7. **Promotion is out of scope.** Personal → organizational transfer remains
    ADR-0002 / PRD-0006 only.
+
+## Attachment presence
+
+Authoritative mapping observed in the 2026-08-16 export:
+
+```text
+metadata.attachments[].id
+        ↓  append ".dat"
+archive entry (file-….dat / file_….dat)
+        ↓  conversation_asset_file_names.json
+original display filename  (not used for presence)
+```
+
+- 337 unique attachment ids; 322 have `{id}.dat` in the archive; 15 do not
+  (true missing blobs, not a mapping miss).
+- `conversation_asset_file_names.json` keys are those `.dat` names; values
+  are original filenames. Values are not archive paths.
+- `library_files.json` is a catalog. Attachment `library_file_id` is a
+  `libfile_…` catalog id. Library `file_id` sometimes also has a `.dat`,
+  but catalog membership is not archive presence.
+- Part-level `file-service://file-…` pointers are a parallel reference
+  form; Phase 1 presence uses `metadata.attachments[].id` only.
+
+`attachmentPresentInArchive` implements the `id` → `{id}.dat` rule against
+the archive file list. It does not read sidecar JSON and does not load
+blob bytes.
 
 ## What this phase does not do
 
