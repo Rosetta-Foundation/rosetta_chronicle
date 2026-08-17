@@ -10,7 +10,14 @@
  * tests, and unit-test the date enumeration helper directly since it's pure.
  */
 import { execFileSync, spawnSync } from 'child_process';
-import { mkdirSync, writeFileSync, rmSync, existsSync } from 'fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 
@@ -35,6 +42,7 @@ describe('chronicle CLI', () => {
     expect(result.stdout).toContain('chronicle backfill');
     expect(result.stdout).toContain('append-session');
     expect(result.stdout).toContain('inventory-chatgpt');
+    expect(result.stdout).toContain('import-chatgpt');
   });
 
   it('inventory-chatgpt exits 1 without --export', () => {
@@ -43,6 +51,24 @@ describe('chronicle CLI', () => {
     });
     expect(result.status).toBe(1);
     expect(result.stderr).toContain('--export');
+  });
+
+  it('import-chatgpt exits 1 without --export', () => {
+    const result = spawnSync(process.execPath, [CLI, 'import-chatgpt'], {
+      encoding: 'utf-8',
+    });
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('--export');
+  });
+
+  it('import-chatgpt exits 1 without --repo', () => {
+    const result = spawnSync(
+      process.execPath,
+      [CLI, 'import-chatgpt', '--export', '/tmp/no-such-chatgpt-export'],
+      { encoding: 'utf-8', env: { ...process.env, CHRONICLE_REPO: undefined } },
+    );
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('--repo');
   });
 
   it('inventory-chatgpt prints JSON for a missing export', () => {
@@ -56,6 +82,59 @@ describe('chronicle CLI', () => {
     expect(parsed.status).toBe('missing');
     expect(parsed.ingestedAt).toBeDefined();
     expect(parsed.conversationCount).toBe(0);
+  });
+
+  it('import-chatgpt --dry-run does not write a graph', () => {
+    const repo = mkdtempSync(join(tmpdir(), 'cli-import-dry-'));
+    const fixture = join(
+      __dirname,
+      'fixtures/chatgpt-export/complete-export',
+    );
+    try {
+      const result = spawnSync(
+        process.execPath,
+        [
+          CLI,
+          'import-chatgpt',
+          '--export',
+          fixture,
+          '--repo',
+          repo,
+          '--dry-run',
+        ],
+        { encoding: 'utf-8' },
+      );
+      expect(result.status).toBe(0);
+      const parsed = JSON.parse(result.stdout);
+      expect(parsed.status).toBe('imported');
+      expect(parsed.conversationCount).toBe(9);
+      expect(existsSync(parsed.path)).toBe(false);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
+
+  it('import-chatgpt writes a graph without leaking source text', () => {
+    const repo = mkdtempSync(join(tmpdir(), 'cli-import-'));
+    const fixture = join(
+      __dirname,
+      'fixtures/chatgpt-export/complete-export',
+    );
+    try {
+      const result = spawnSync(
+        process.execPath,
+        [CLI, 'import-chatgpt', '--export', fixture, '--repo', repo],
+        { encoding: 'utf-8' },
+      );
+      expect(result.status).toBe(0);
+      const parsed = JSON.parse(result.stdout);
+      expect(parsed.status).toBe('imported');
+      const dumped = readFileSync(parsed.path, 'utf-8');
+      expect(dumped).not.toContain('REDACTED_SHOULD_NOT_LEAK');
+      expect(dumped).not.toContain('SYNTHETIC_TITLE_MUST_NOT_LEAK');
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
   });
 
   it('exits 1 with unknown command', () => {

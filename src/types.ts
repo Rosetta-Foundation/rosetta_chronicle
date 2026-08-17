@@ -23,8 +23,8 @@ export type ActivitySource =
   | 'calendar';
 
 // future: 'github' | 'slack' | 'confluence' | 'chatgpt-export'
-// `chatgpt-export` is not a member until import emits Activity (PRD-0027).
-// Phase 1 inventory is a read-only command, not an activity source.
+// `chatgpt-export` is not a member. Phase 2 persists a source graph, not
+// Activity. Leave this union unchanged until a later phase emits Activity.
 /** The Rosetta tag taxonomy (see docs/mvp.md). */
 export type Tag =
   | 'DELIVERY'
@@ -340,6 +340,94 @@ export interface ChatGptRawExport {
 export type ChatGptExportReadResult =
   | { ok: true; export: ChatGptRawExport }
   | { ok: false; reason: 'missing' | 'invalid'; message: string };
+
+// ─── ChatGPT source graph (PRD-0027 Phase 2) ─────────────────────────────────
+
+/** Attachment ref on a durable source-graph node. No display filename. */
+export interface ChatGptSourceAttachmentRef {
+  id?: string;
+  presentInArchive: boolean;
+  mimeType?: string;
+  size?: number;
+  libraryFileId?: string;
+}
+
+/**
+ * Durable node in the normalized conversation graph. Topology and type only —
+ * no message text. `sourceChildIds` is what the vendor wrote;
+ * `reconstructedChildIds` is inferred from parent links.
+ */
+export interface ChatGptSourceNode {
+  id: string;
+  parentId?: string | null;
+  sourceChildIds: string[];
+  reconstructedChildIds: string[];
+  hasMessage: boolean;
+  role?: string;
+  contentType?: string;
+  createTime?: string;
+  updateTime?: string;
+  attachments: ChatGptSourceAttachmentRef[];
+}
+
+/** Durable conversation. Title is not stored. */
+export interface ChatGptSourceConversation {
+  sourceId: string;
+  currentNodeId?: string;
+  createTime?: string;
+  updateTime?: string;
+  archived: boolean;
+  nodes: ChatGptSourceNode[];
+}
+
+/**
+ * Archive identity for a persisted graph. Bytes stay outside the repository
+ * in this phase; hash is the idempotency key.
+ */
+export interface ChatGptSourceArchive {
+  contentHash: string;
+  kind: ChatGptExportKind;
+  importedAt: string;
+  shardNames: string[];
+  sidecarFiles: string[];
+}
+
+/**
+ * Normalized ChatGPT conversation graph (PRD-0027 Phase 2). Source record,
+ * not Activity. No titles, parts, or attachment bytes.
+ */
+export interface ChatGptSourceGraph {
+  archive: ChatGptSourceArchive;
+  conversations: ChatGptSourceConversation[];
+  unsupported: ChatGptUnsupportedRecord[];
+}
+
+/** Input to the ChatGPT source-graph import handler. */
+export interface ChatGptImportInput {
+  exportPath: string;
+  /** Absolute path to the personal Chronicle repository. */
+  repoPath: string;
+  ingestedAt?: string;
+  /** Build the graph and do not write. */
+  dryRun?: boolean;
+}
+
+export type ChatGptImportStatus =
+  | 'imported'
+  | 'already-present'
+  | 'missing'
+  | 'invalid';
+
+/** Result of a source-graph import. Never includes source text. */
+export interface ChatGptImportResult {
+  status: ChatGptImportStatus;
+  contentHash?: string;
+  path?: string;
+  conversationCount: number;
+  nodeCount: number;
+  importedAt?: string;
+  error?: string;
+}
 
 /** Derived inventory of a ChatGPT export. Contains no source message text. */
 export interface ChatGptExportInventory {

@@ -48,6 +48,13 @@ ChatGPT export inventory (PRD-0027 Phase 1) follows the same layers — `ChatGpt
 synthesis. It makes the engine aware of a new source without writing ChatGPT content into a
 Chronicle. See `docs/design/chatgpt-export-inventory.md`.
 
+ChatGPT source-graph import (PRD-0027 Phase 2) is a second handler on the same stripped export:
+`ChatGptImportHandler` → `ChatGptImportService` → `ChatGptExportRepository` + `ChatGptGraphStore`.
+It persists a normalized conversation graph into the personal Chronicle repo
+(`chronicles/.data/chatgpt-export/<contentHash>.json`). That record is a source graph, not
+`Activity`, and it does not enter Daily Chronicle synthesis. `chatgpt-export` stays off
+`ActivitySource`. See `docs/design/chatgpt-export-source-graph.md`.
+
 ### Dependency direction
 
 ```

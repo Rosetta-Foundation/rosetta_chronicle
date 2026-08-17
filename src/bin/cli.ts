@@ -3,6 +3,7 @@ import 'reflect-metadata';
 import {
   getDailyChronicleHandler,
   getChatGptInventoryHandler,
+  getChatGptImportHandler,
   buildContainer,
 } from '../index';
 import { DailyChronicleInput, QueueItem, QueueState } from '../types';
@@ -23,9 +24,11 @@ import { CHRONICLE_TOKENS } from '../tokens';
  *   chronicle backfill   Generate and persist Chronicles for a date range.
  *   chronicle append-session   Append a single agent session to today's Chronicle.
  *   chronicle inventory-chatgpt   Read-only ChatGPT export inventory (PRD-0027).
+ *   chronicle import-chatgpt      Persist a stripped source graph (PRD-0027).
  *
- * Both write to the personal Chronicle repo (CHRONICLE_REPO env var or --repo flag).
- * Both are idempotent: content-hash dedup means re-running is safe.
+ * Daily Chronicle commands write to the personal Chronicle repo
+ * (CHRONICLE_REPO env var or --repo flag) and are idempotent by content hash.
+ * import-chatgpt writes a source graph, not Activity or a Daily Chronicle.
  */
 
 const USAGE = `
@@ -33,6 +36,7 @@ Usage:
   chronicle backfill [options]
   chronicle append-session [options]
   chronicle inventory-chatgpt --export <path>
+  chronicle import-chatgpt --export <path> --repo <path> [--dry-run]
   chronicle queue [show] [--repo <path>]
   chronicle queue add "<title>" [--jira KEY] [--prd NNNN/N] [--due DATE] [--repo <path>]
   chronicle queue done "<title-or-id>" [--repo <path>]
@@ -51,6 +55,9 @@ Commands:
     list              List all items in a state.
   inventory-chatgpt   Read-only inventory of a ChatGPT export directory or
                       zip. Prints JSON. Does not write a Chronicle.
+  import-chatgpt      Persist a stripped conversation graph into a personal
+                      Chronicle repo. Idempotent by archive content hash.
+                      Does not emit Activity or write a Daily Chronicle.
 
 Options:
   --repo <path>       Absolute path to your personal Chronicle repo.
@@ -71,7 +78,8 @@ Options:
   --prd <NNNN/N>      Attach a PRD phase reference (e.g. 0007/1).
   --due <YYYY-MM-DD>  Attach a due-date signal to a new queue item.
   --state <state>     Filter queue list by state (active|next|inbox|done).
-  --export <path>     ChatGPT export directory or .zip (inventory-chatgpt).
+  --export <path>     ChatGPT export directory or .zip
+                      (inventory-chatgpt, import-chatgpt).
   -h, --help          Show this help.
 
 Environment variables:
@@ -536,6 +544,24 @@ async function runInventoryChatgpt(args: ParsedArgs): Promise<void> {
   if (inventory.status !== 'ok') process.exit(1);
 }
 
+async function runImportChatgpt(args: ParsedArgs): Promise<void> {
+  const exportPath = args.exportPath;
+  if (!exportPath) die('--export <path> is required for import-chatgpt');
+  const repo = args.repo ?? process.env['CHRONICLE_REPO'];
+  if (!repo)
+    die('--repo <path> (or $CHRONICLE_REPO) is required for import-chatgpt');
+  const handler = getChatGptImportHandler();
+  const result = await handler.handle({
+    exportPath,
+    repoPath: repo,
+    dryRun: args.dryRun,
+  });
+  console.log(JSON.stringify(result, null, 2));
+  if (result.status === 'missing' || result.status === 'invalid') {
+    process.exit(1);
+  }
+}
+
 async function main(): Promise<void> {
   const args = parseArgs(process.argv);
 
@@ -551,6 +577,9 @@ async function main(): Promise<void> {
       break;
     case 'inventory-chatgpt':
       await runInventoryChatgpt(args);
+      break;
+    case 'import-chatgpt':
+      await runImportChatgpt(args);
       break;
     default:
       console.error(`chronicle: unknown command '${args.command}'\n`);

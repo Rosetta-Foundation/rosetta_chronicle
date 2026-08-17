@@ -34,7 +34,7 @@ Structural observations (no source text retained):
 
 | Kind | What it is |
 | --- | --- |
-| Source data | Export bytes on disk. Never copied into Chronicle. Titles and parts stripped at the repository boundary. |
+| Source data | Export bytes on disk. Phase 1 does not copy them. Phase 2 still keeps bytes outside the repository while private storage policy is open — that is not a permanent architectural ban. Titles and parts are stripped at the repository boundary. |
 | Derived inventory | Counts, topology flags, content-type names, attachment completeness, unsupported reasons. |
 | Event time | Unix timestamps from the export, converted to ISO-8601. |
 | Ingestion time | When the inventory ran (`ingestedAt`). Not an event timestamp. |
@@ -67,10 +67,10 @@ The PRD types remain the Phase 2 target. Phase 1 revises them as follows:
 5. **Titles are source content.** Default inventory does not emit them.
    `ConversationArtifact.title` stays optional and must not be required for
    topology.
-6. **Do not add `chatgpt-export` to `ActivitySource` in Phase 1.** That union
-   is the `source` field on `Activity` / `Evidence`. Inventory does not emit
-   either. Leave `chatgpt-export` as a `// future:` comment until import
-   actually produces activity (PRD-0027 Phase 2).
+6. **Do not add `chatgpt-export` to `ActivitySource`.** That union is the
+   `source` field on `Activity` / `Evidence`. Phase 1 inventory and Phase 2
+   source-graph import emit neither. Leave `chatgpt-export` as a `// future:`
+   comment until a later phase actually produces activity.
 7. **Promotion is out of scope.** Personal → organizational transfer remains
    ADR-0002 / PRD-0006 only.
 
@@ -103,7 +103,8 @@ blob bytes.
 
 ## What this phase does not do
 
-- Write ChatGPT content into a Chronicle or sidecar
+- Write ChatGPT content into a Chronicle or sidecar (Phase 2 persists a
+  stripped source graph — see `chatgpt-export-source-graph.md`)
 - Encrypt or vault the export
 - Emit `Activity` / `Evidence` records
 - Model reflections, dispositions, or path links

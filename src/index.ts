@@ -10,6 +10,10 @@ import {
   ChatGptInventoryHandler,
 } from './chatgpt-inventory.handler';
 import {
+  IChatGptImportHandler,
+  ChatGptImportHandler,
+} from './chatgpt-import.handler';
+import {
   IChronicleService,
   ChronicleService,
 } from './services/chronicle.service';
@@ -17,6 +21,10 @@ import {
   IChatGptInventoryService,
   ChatGptInventoryService,
 } from './services/chatgpt-inventory.service';
+import {
+  IChatGptImportService,
+  ChatGptImportService,
+} from './services/chatgpt-import.service';
 import { IGitRepository, GitRepository } from './repositories/git.repository';
 import {
   IGitDiscoveryRepository,
@@ -56,6 +64,10 @@ import {
   IChatGptExportRepository,
   ChatGptExportRepository,
 } from './repositories/chatgpt-export.repository';
+import {
+  IChatGptGraphStore,
+  ChatGptGraphStore,
+} from './repositories/chatgpt-graph-store.repository';
 
 /**
  * Composition root. Wires the InversifyJS container and exposes a factory for
@@ -97,6 +109,9 @@ export const buildContainer = (): Container => {
   container
     .bind<IChatGptExportRepository>(CHRONICLE_TOKENS.ChatGptExportRepository)
     .to(ChatGptExportRepository);
+  container
+    .bind<IChatGptGraphStore>(CHRONICLE_TOKENS.ChatGptGraphStore)
+    .to(ChatGptGraphStore);
 
   // Services
   container
@@ -105,6 +120,9 @@ export const buildContainer = (): Container => {
   container
     .bind<IChatGptInventoryService>(CHRONICLE_TOKENS.ChatGptInventoryService)
     .to(ChatGptInventoryService);
+  container
+    .bind<IChatGptImportService>(CHRONICLE_TOKENS.ChatGptImportService)
+    .to(ChatGptImportService);
 
   // Handlers
   container
@@ -113,6 +131,9 @@ export const buildContainer = (): Container => {
   container
     .bind<IChatGptInventoryHandler>(CHRONICLE_TOKENS.ChatGptInventoryHandler)
     .to(ChatGptInventoryHandler);
+  container
+    .bind<IChatGptImportHandler>(CHRONICLE_TOKENS.ChatGptImportHandler)
+    .to(ChatGptImportHandler);
 
   return container;
 };
@@ -128,5 +149,12 @@ export const getDailyChronicleHandler = (): IDailyChronicleHandler => {
 export const getChatGptInventoryHandler = (): IChatGptInventoryHandler => {
   return buildContainer().get<IChatGptInventoryHandler>(
     CHRONICLE_TOKENS.ChatGptInventoryHandler,
+  );
+};
+
+/** Resolve the ChatGPT source-graph import handler from a fresh container. */
+export const getChatGptImportHandler = (): IChatGptImportHandler => {
+  return buildContainer().get<IChatGptImportHandler>(
+    CHRONICLE_TOKENS.ChatGptImportHandler,
   );
 };
