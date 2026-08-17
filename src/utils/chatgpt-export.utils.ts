@@ -6,6 +6,9 @@ import {
   ChatGptRawConversation,
   ChatGptRawExport,
   ChatGptRawNode,
+  ChatGptSourceConversation,
+  ChatGptSourceGraph,
+  ChatGptSourceNode,
   ChatGptUnsupportedRecord,
 } from '../types';
 
@@ -56,6 +59,9 @@ export const partShape = (part: unknown): ChatGptPartShape => {
 /**
  * Rebuild child ids from parent links. This export's nodes omit `children`;
  * topology is parent-linked. Source children, when present, are unioned in.
+ *
+ * Inventory uses this union to flag `branched`. The durable source graph
+ * stores the two topologies separately — see {@link childIdsFromParents}.
  */
 export const reconstructChildIds = (
   nodes: ChatGptRawNode[],
@@ -75,6 +81,74 @@ export const reconstructChildIds = (
     }
   }
   return byParent;
+};
+
+/**
+ * Children inferred only from parent pointers. Does not union vendor
+ * `children`. The source graph persists this beside `sourceChildIds`.
+ */
+export const childIdsFromParents = (
+  nodes: ChatGptRawNode[],
+): Map<string, string[]> => {
+  const byParent = new Map<string, string[]>();
+  for (const node of nodes) {
+    if (!node.id || !node.parentId) continue;
+    const list = byParent.get(node.parentId) ?? [];
+    if (!list.includes(node.id)) list.push(node.id);
+    byParent.set(node.parentId, list);
+  }
+  return byParent;
+};
+
+/**
+ * Structural gaps on a stripped export. Shared by inventory and the source
+ * graph so unsupported records stay aligned. Does not drop nodes.
+ */
+export const collectUnsupported = (
+  raw: ChatGptRawExport,
+): ChatGptUnsupportedRecord[] => {
+  const unsupported: ChatGptUnsupportedRecord[] = [...raw.unsupported];
+  for (const conv of raw.conversations) {
+    if (conv.malformedReasons.length > 0 || !conv.sourceId) {
+      for (const reason of conv.malformedReasons) {
+        unsupported.push({ conversationId: conv.sourceId, reason });
+      }
+      if (!conv.sourceId) {
+        unsupported.push({ reason: 'conversation-missing-id' });
+      }
+    }
+    for (const node of conv.nodes) {
+      for (const reason of node.malformedReasons) {
+        unsupported.push({
+          conversationId: conv.sourceId,
+          nodeId: node.id,
+          reason,
+        });
+      }
+      if (!node.hasMessage) continue;
+      if (node.contentType && !KNOWN_CONTENT_TYPES.has(node.contentType)) {
+        unsupported.push({
+          conversationId: conv.sourceId,
+          nodeId: node.id,
+          reason: `unknown-content-type:${node.contentType}`,
+        });
+      }
+      for (const ref of node.attachmentRefs) {
+        const id = ref.id;
+        const present = id
+          ? attachmentPresentInArchive(id, raw.archiveFiles)
+          : false;
+        if (!present) {
+          unsupported.push({
+            conversationId: conv.sourceId,
+            nodeId: node.id,
+            reason: 'attachment-missing-from-archive',
+          });
+        }
+      }
+    }
+  }
+  return unsupported;
 };
 
 const bump = (counts: Record<string, number>, key: string): void => {
@@ -114,7 +188,7 @@ export const buildInventory = (
   sourcePath: string,
   ingestedAt: string,
 ): ChatGptExportInventory => {
-  const unsupported: ChatGptUnsupportedRecord[] = [...raw.unsupported];
+  const unsupported = collectUnsupported(raw);
   const roleCounts: Record<string, number> = {};
   const contentTypeSet = new Set<string>();
   const conversations: ChatGptConversationInventory[] = [];
@@ -127,15 +201,6 @@ export const buildInventory = (
   const eventTimes: number[] = [];
 
   for (const conv of raw.conversations) {
-    if (conv.malformedReasons.length > 0 || !conv.sourceId) {
-      for (const reason of conv.malformedReasons) {
-        unsupported.push({ conversationId: conv.sourceId, reason });
-      }
-      if (!conv.sourceId) {
-        unsupported.push({ reason: 'conversation-missing-id' });
-      }
-    }
-
     const childrenByParent = reconstructChildIds(conv.nodes);
     let branched = false;
     for (const kids of childrenByParent.values()) {
@@ -154,15 +219,6 @@ export const buildInventory = (
 
     for (const node of conv.nodes) {
       nodeCount++;
-      if (node.malformedReasons.length > 0) {
-        for (const reason of node.malformedReasons) {
-          unsupported.push({
-            conversationId: conv.sourceId,
-            nodeId: node.id,
-            reason,
-          });
-        }
-      }
       if (!node.hasMessage) {
         convNull++;
         continue;
@@ -175,13 +231,6 @@ export const buildInventory = (
       if (node.contentType) {
         convTypes.add(node.contentType);
         contentTypeSet.add(node.contentType);
-        if (!KNOWN_CONTENT_TYPES.has(node.contentType)) {
-          unsupported.push({
-            conversationId: conv.sourceId,
-            nodeId: node.id,
-            reason: `unknown-content-type:${node.contentType}`,
-          });
-        }
       }
       if (node.createTime == null) missingTs = true;
       else eventTimes.push(node.createTime);
@@ -195,14 +244,7 @@ export const buildInventory = (
           ? attachmentPresentInArchive(id, raw.archiveFiles)
           : false;
         if (present) attachmentsPresent++;
-        else {
-          attachmentsMissing++;
-          unsupported.push({
-            conversationId: conv.sourceId,
-            nodeId: node.id,
-            reason: 'attachment-missing-from-archive',
-          });
-        }
+        else attachmentsMissing++;
       }
     }
 
@@ -264,6 +306,70 @@ export const buildInventory = (
     privacySignals,
     unsupported,
     conversations,
+  };
+};
+
+/**
+ * Normalize a stripped export into a durable conversation graph. Topology
+ * and type only — no titles, parts, or attachment bytes. Source children
+ * and parent-reconstructed children are stored separately.
+ */
+export const buildSourceGraph = (
+  raw: ChatGptRawExport,
+  importedAt: string,
+): ChatGptSourceGraph => {
+  const conversations: ChatGptSourceConversation[] = [];
+  for (const conv of raw.conversations) {
+    if (!conv.sourceId) continue;
+    const reconstructed = childIdsFromParents(conv.nodes);
+    const nodes: ChatGptSourceNode[] = [];
+    for (const node of conv.nodes) {
+      if (!node.id) continue;
+      nodes.push({
+        id: node.id,
+        parentId: node.parentId,
+        sourceChildIds: [...node.sourceChildIds],
+        reconstructedChildIds: reconstructed.get(node.id) ?? [],
+        hasMessage: node.hasMessage,
+        ...(node.role ? { role: node.role } : {}),
+        ...(node.contentType ? { contentType: node.contentType } : {}),
+        ...(typeof node.createTime === 'number'
+          ? { createTime: unixSecondsToIso(node.createTime) }
+          : {}),
+        ...(typeof node.updateTime === 'number'
+          ? { updateTime: unixSecondsToIso(node.updateTime) }
+          : {}),
+        attachments: node.attachmentRefs.map((ref) => ({
+          ...ref,
+          presentInArchive: ref.id
+            ? attachmentPresentInArchive(ref.id, raw.archiveFiles)
+            : false,
+        })),
+      });
+    }
+    conversations.push({
+      sourceId: conv.sourceId,
+      ...(conv.currentNodeId ? { currentNodeId: conv.currentNodeId } : {}),
+      ...(typeof conv.createTime === 'number'
+        ? { createTime: unixSecondsToIso(conv.createTime) }
+        : {}),
+      ...(typeof conv.updateTime === 'number'
+        ? { updateTime: unixSecondsToIso(conv.updateTime) }
+        : {}),
+      archived: conv.archived,
+      nodes,
+    });
+  }
+  return {
+    archive: {
+      contentHash: raw.contentHash,
+      kind: raw.kind,
+      importedAt,
+      shardNames: [...raw.shardNames],
+      sidecarFiles: [...raw.sidecarFiles].sort(),
+    },
+    conversations,
+    unsupported: collectUnsupported(raw),
   };
 };
 

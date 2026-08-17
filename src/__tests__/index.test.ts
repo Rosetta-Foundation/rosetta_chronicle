@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import {
   buildContainer,
+  getChatGptImportHandler,
   getChatGptInventoryHandler,
   getDailyChronicleHandler,
 } from '../index';
@@ -40,6 +41,14 @@ describe('getDailyChronicleHandler', () => {
 describe('getChatGptInventoryHandler', () => {
   it('resolves the inventory handler with its dependency graph', () => {
     const handler = getChatGptInventoryHandler();
+    expect(handler).toBeDefined();
+    expect(typeof handler.handle).toBe('function');
+  });
+});
+
+describe('getChatGptImportHandler', () => {
+  it('resolves the import handler with its dependency graph', () => {
+    const handler = getChatGptImportHandler();
     expect(handler).toBeDefined();
     expect(typeof handler.handle).toBe('function');
   });
