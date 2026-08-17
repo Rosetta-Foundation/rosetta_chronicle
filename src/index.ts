@@ -6,9 +6,17 @@ import {
   DailyChronicleHandler,
 } from './daily-chronicle.handler';
 import {
+  IChatGptInventoryHandler,
+  ChatGptInventoryHandler,
+} from './chatgpt-inventory.handler';
+import {
   IChronicleService,
   ChronicleService,
 } from './services/chronicle.service';
+import {
+  IChatGptInventoryService,
+  ChatGptInventoryService,
+} from './services/chatgpt-inventory.service';
 import { IGitRepository, GitRepository } from './repositories/git.repository';
 import {
   IGitDiscoveryRepository,
@@ -44,6 +52,10 @@ import {
   ChronicleStore,
 } from './repositories/chronicle-store.repository';
 import { IQueueStore, QueueStore } from './repositories/queue-store.repository';
+import {
+  IChatGptExportRepository,
+  ChatGptExportRepository,
+} from './repositories/chatgpt-export.repository';
 
 /**
  * Composition root. Wires the InversifyJS container and exposes a factory for
@@ -82,16 +94,25 @@ export const buildContainer = (): Container => {
     .bind<IChronicleStore>(CHRONICLE_TOKENS.ChronicleStore)
     .to(ChronicleStore);
   container.bind<IQueueStore>(CHRONICLE_TOKENS.QueueStore).to(QueueStore);
+  container
+    .bind<IChatGptExportRepository>(CHRONICLE_TOKENS.ChatGptExportRepository)
+    .to(ChatGptExportRepository);
 
   // Services
   container
     .bind<IChronicleService>(CHRONICLE_TOKENS.ChronicleService)
     .to(ChronicleService);
+  container
+    .bind<IChatGptInventoryService>(CHRONICLE_TOKENS.ChatGptInventoryService)
+    .to(ChatGptInventoryService);
 
   // Handlers
   container
     .bind<IDailyChronicleHandler>(CHRONICLE_TOKENS.DailyChronicleHandler)
     .to(DailyChronicleHandler);
+  container
+    .bind<IChatGptInventoryHandler>(CHRONICLE_TOKENS.ChatGptInventoryHandler)
+    .to(ChatGptInventoryHandler);
 
   return container;
 };
@@ -100,5 +121,12 @@ export const buildContainer = (): Container => {
 export const getDailyChronicleHandler = (): IDailyChronicleHandler => {
   return buildContainer().get<IDailyChronicleHandler>(
     CHRONICLE_TOKENS.DailyChronicleHandler,
+  );
+};
+
+/** Resolve the ChatGPT export inventory handler from a fresh container. */
+export const getChatGptInventoryHandler = (): IChatGptInventoryHandler => {
+  return buildContainer().get<IChatGptInventoryHandler>(
+    CHRONICLE_TOKENS.ChatGptInventoryHandler,
   );
 };

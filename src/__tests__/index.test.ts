@@ -1,5 +1,9 @@
 import 'reflect-metadata';
-import { buildContainer, getDailyChronicleHandler } from '../index';
+import {
+  buildContainer,
+  getChatGptInventoryHandler,
+  getDailyChronicleHandler,
+} from '../index';
 import { CHRONICLE_TOKENS } from '../tokens';
 
 /**
@@ -28,6 +32,14 @@ describe('buildContainer', () => {
 describe('getDailyChronicleHandler', () => {
   it('resolves the root handler with its full dependency graph', () => {
     const handler = getDailyChronicleHandler();
+    expect(handler).toBeDefined();
+    expect(typeof handler.handle).toBe('function');
+  });
+});
+
+describe('getChatGptInventoryHandler', () => {
+  it('resolves the inventory handler with its dependency graph', () => {
+    const handler = getChatGptInventoryHandler();
     expect(handler).toBeDefined();
     expect(typeof handler.handle).toBe('function');
   });

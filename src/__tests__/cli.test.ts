@@ -34,6 +34,28 @@ describe('chronicle CLI', () => {
     expect(result.status).toBe(0);
     expect(result.stdout).toContain('chronicle backfill');
     expect(result.stdout).toContain('append-session');
+    expect(result.stdout).toContain('inventory-chatgpt');
+  });
+
+  it('inventory-chatgpt exits 1 without --export', () => {
+    const result = spawnSync(process.execPath, [CLI, 'inventory-chatgpt'], {
+      encoding: 'utf-8',
+    });
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('--export');
+  });
+
+  it('inventory-chatgpt prints JSON for a missing export', () => {
+    const result = spawnSync(
+      process.execPath,
+      [CLI, 'inventory-chatgpt', '--export', '/tmp/no-such-chatgpt-export'],
+      { encoding: 'utf-8' },
+    );
+    expect(result.status).toBe(1);
+    const parsed = JSON.parse(result.stdout);
+    expect(parsed.status).toBe('missing');
+    expect(parsed.ingestedAt).toBeDefined();
+    expect(parsed.conversationCount).toBe(0);
   });
 
   it('exits 1 with unknown command', () => {

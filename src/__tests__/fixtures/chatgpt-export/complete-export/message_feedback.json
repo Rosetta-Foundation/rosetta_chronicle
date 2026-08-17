@@ -1,0 +1,8 @@
+[
+  {
+    "id": "feedback-1",
+    "conversation_id": "conv-linear",
+    "rating": "thumbs_up",
+    "content": "REDACTED_SHOULD_NOT_LEAK"
+  }
+]

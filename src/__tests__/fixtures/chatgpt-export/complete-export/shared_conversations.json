@@ -1,0 +1,8 @@
+[
+  {
+    "id": "share-1",
+    "conversation_id": "conv-linear",
+    "is_anonymous": true,
+    "title": "SYNTHETIC_TITLE_MUST_NOT_LEAK"
+  }
+]

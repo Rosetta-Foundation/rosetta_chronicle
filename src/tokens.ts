@@ -10,12 +10,15 @@
 export const CHRONICLE_TOKENS = {
   // Handlers
   DailyChronicleHandler: Symbol.for('DailyChronicleHandler'),
+  ChatGptInventoryHandler: Symbol.for('ChatGptInventoryHandler'),
 
   // Services
   ChronicleService: Symbol.for('ChronicleService'),
+  ChatGptInventoryService: Symbol.for('ChatGptInventoryService'),
 
   // Repositories (one per source)
   GitRepository: Symbol.for('GitRepository'),
+  ChatGptExportRepository: Symbol.for('ChatGptExportRepository'),
   GitDiscoveryRepository: Symbol.for('GitDiscoveryRepository'),
   JiraRepository: Symbol.for('JiraRepository'),
   ClaudeCodeRepository: Symbol.for('ClaudeCodeRepository'),

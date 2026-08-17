@@ -1,0 +1,6 @@
+{
+  "id": "user-fixture",
+  "email": "REDACTED_EMAIL_MUST_NOT_LEAK",
+  "phone_number": "+10000000000",
+  "chatgpt_plus_user": false
+}
