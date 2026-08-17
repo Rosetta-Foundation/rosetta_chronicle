@@ -1,0 +1,231 @@
+[
+  {
+    "id": "conv-linear",
+    "conversation_id": "conv-linear",
+    "create_time": 1700000000,
+    "update_time": 1700000600,
+    "current_node": "node-linear-2",
+    "is_archived": false,
+    "is_starred": false,
+    "default_model_slug": "gpt-4o",
+    "title": "SYNTHETIC_TITLE_MUST_NOT_LEAK",
+    "mapping": {
+      "node-linear-root": {
+        "id": "node-linear-root",
+        "parent": null,
+        "message": null
+      },
+      "node-linear-1": {
+        "id": "node-linear-1",
+        "parent": "node-linear-root",
+        "message": {
+          "id": "msg-linear-1",
+          "author": { "role": "user" },
+          "create_time": 1700000001.5,
+          "content": {
+            "content_type": "text",
+            "parts": ["REDACTED_SHOULD_NOT_LEAK"]
+          }
+        }
+      },
+      "node-linear-2": {
+        "id": "node-linear-2",
+        "parent": "node-linear-1",
+        "message": {
+          "id": "msg-linear-2",
+          "author": { "role": "assistant" },
+          "create_time": 1700000030,
+          "content": {
+            "content_type": "text",
+            "parts": ["REDACTED_SHOULD_NOT_LEAK"]
+          },
+          "metadata": { "model_slug": "gpt-4o" }
+        }
+      }
+    }
+  },
+  {
+    "id": "conv-parent-branch",
+    "conversation_id": "conv-parent-branch",
+    "create_time": 1700001000,
+    "update_time": 1700001600,
+    "current_node": "node-branch-a",
+    "is_archived": false,
+    "title": "SYNTHETIC_TITLE_MUST_NOT_LEAK",
+    "mapping": {
+      "node-branch-root": {
+        "id": "node-branch-root",
+        "parent": null,
+        "message": null
+      },
+      "node-branch-a": {
+        "id": "node-branch-a",
+        "parent": "node-branch-root",
+        "message": {
+          "id": "msg-branch-a",
+          "author": { "role": "user" },
+          "create_time": 1700001100,
+          "content": { "content_type": "text", "parts": ["REDACTED_SHOULD_NOT_LEAK"] }
+        }
+      },
+      "node-branch-b": {
+        "id": "node-branch-b",
+        "parent": "node-branch-root",
+        "message": {
+          "id": "msg-branch-b",
+          "author": { "role": "user" },
+          "create_time": 1700001200,
+          "content": { "content_type": "text", "parts": ["REDACTED_SHOULD_NOT_LEAK"] }
+        }
+      }
+    }
+  },
+  {
+    "id": "conv-multimodal",
+    "conversation_id": "conv-multimodal",
+    "create_time": 1700002000,
+    "update_time": 1700002100,
+    "current_node": "node-mm-1",
+    "is_archived": false,
+    "title": "SYNTHETIC_TITLE_MUST_NOT_LEAK",
+    "mapping": {
+      "node-mm-root": {
+        "id": "node-mm-root",
+        "parent": null,
+        "message": null
+      },
+      "node-mm-1": {
+        "id": "node-mm-1",
+        "parent": "node-mm-root",
+        "message": {
+          "id": "msg-mm-1",
+          "author": { "role": "user" },
+          "create_time": 1700002001,
+          "content": {
+            "content_type": "multimodal_text",
+            "parts": [
+              { "content_type": "image_asset_pointer", "asset_pointer": "file-fixture-present" },
+              "REDACTED_SHOULD_NOT_LEAK"
+            ]
+          },
+          "metadata": {
+            "attachments": [
+              {
+                "id": "file-fixture-present",
+                "mime_type": "image/png",
+                "name": "REDACTED_FILENAME_MUST_NOT_LEAK.png",
+                "size": 12
+              },
+              {
+                "id": "file-fixture-absent",
+                "mime_type": "application/pdf",
+                "name": "REDACTED_FILENAME_MUST_NOT_LEAK.pdf",
+                "size": 4
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+  {
+    "id": "conv-thoughts",
+    "conversation_id": "conv-thoughts",
+    "create_time": 1700003000,
+    "update_time": 1700003100,
+    "current_node": "node-th-2",
+    "is_archived": false,
+    "title": "SYNTHETIC_TITLE_MUST_NOT_LEAK",
+    "mapping": {
+      "node-th-root": {
+        "id": "node-th-root",
+        "parent": null,
+        "message": null
+      },
+      "node-th-1": {
+        "id": "node-th-1",
+        "parent": "node-th-root",
+        "message": {
+          "id": "msg-th-1",
+          "author": { "role": "assistant" },
+          "create_time": 1700003001,
+          "content": {
+            "content_type": "thoughts",
+            "thoughts": [{ "summary": "REDACTED_SHOULD_NOT_LEAK" }]
+          }
+        }
+      },
+      "node-th-2": {
+        "id": "node-th-2",
+        "parent": "node-th-1",
+        "message": {
+          "id": "msg-th-2",
+          "author": { "role": "assistant" },
+          "create_time": 1700003002,
+          "content": {
+            "content_type": "reasoning_recap",
+            "content": "REDACTED_SHOULD_NOT_LEAK"
+          }
+        }
+      }
+    }
+  },
+  {
+    "id": "conv-audio",
+    "conversation_id": "conv-audio",
+    "create_time": 1700004000,
+    "update_time": 1700004100,
+    "current_node": "node-au-1",
+    "is_archived": false,
+    "title": "SYNTHETIC_TITLE_MUST_NOT_LEAK",
+    "mapping": {
+      "node-au-root": {
+        "id": "node-au-root",
+        "parent": null,
+        "message": null
+      },
+      "node-au-1": {
+        "id": "node-au-1",
+        "parent": "node-au-root",
+        "message": {
+          "id": "msg-au-1",
+          "author": { "role": "user" },
+          "create_time": 1700004001,
+          "content": {
+            "content_type": "multimodal_text",
+            "parts": [
+              { "content_type": "audio_asset_pointer" },
+              { "content_type": "audio_transcription" }
+            ]
+          }
+        }
+      }
+    }
+  },
+  {
+    "id": "conv-archived",
+    "conversation_id": "conv-archived",
+    "create_time": 1700005000,
+    "update_time": 1700005100,
+    "current_node": "node-ar-1",
+    "is_archived": true,
+    "title": "SYNTHETIC_TITLE_MUST_NOT_LEAK",
+    "mapping": {
+      "node-ar-root": {
+        "id": "node-ar-root",
+        "parent": null,
+        "message": null
+      },
+      "node-ar-1": {
+        "id": "node-ar-1",
+        "parent": "node-ar-root",
+        "message": {
+          "id": "msg-ar-1",
+          "author": { "role": "user" },
+          "create_time": 1700005001,
+          "content": { "content_type": "text", "parts": ["REDACTED_SHOULD_NOT_LEAK"] }
+        }
+      }
+    }
+  }
+]

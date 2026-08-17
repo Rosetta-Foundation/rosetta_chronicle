@@ -43,6 +43,11 @@ Chronicle follows the mandatory Rosetta pattern (full ruleset:
 Adding a new activity source (GitHub, Slack, Confluence, Calendar) means adding a new repository that
 implements a source-adapter contract, then wiring it into the service — no changes to the handler.
 
+ChatGPT export inventory (PRD-0027 Phase 1) follows the same layers — `ChatGptInventoryHandler` →
+`ChatGptInventoryService` → `ChatGptExportRepository` — but is **not** wired into Daily Chronicle
+synthesis. It makes the engine aware of a new source without writing ChatGPT content into a
+Chronicle. See `docs/design/chatgpt-export-inventory.md`.
+
 ### Dependency direction
 
 ```

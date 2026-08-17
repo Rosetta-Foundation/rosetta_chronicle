@@ -54,7 +54,9 @@ Tags are inferred automatically wherever possible (see `src/utils/tags.utils.ts`
 
 ## Out of scope for v0.1
 
-- GitHub, Slack, Confluence, Calendar sources (future repositories, same pattern)
+- GitHub, Slack, Confluence sources (future repositories, same pattern)
+- ChatGPT export **import** into Daily Chronicle (PRD-0027 Phase 1 is
+  inventory-only; see `docs/design/chatgpt-export-inventory.md`)
 - Weekly / Monthly / Quarterly Chronicles
 - Promotion packets, organizational timeline, knowledge graph
 - Any presentation layer (that is Wayfinder's job) — v0.1 emits Markdown only

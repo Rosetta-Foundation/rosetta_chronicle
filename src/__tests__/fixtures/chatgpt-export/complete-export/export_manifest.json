@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "manifest_file": "export_manifest.json",
+  "logical_files": {
+    "conversations.json": ["conversations-000.json", "conversations-001.json"]
+  },
+  "export_files": ["conversations-000.json", "conversations-001.json"]
+}

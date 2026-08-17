@@ -1,6 +1,10 @@
 #!/usr/bin/env node
 import 'reflect-metadata';
-import { getDailyChronicleHandler, buildContainer } from '../index';
+import {
+  getDailyChronicleHandler,
+  getChatGptInventoryHandler,
+  buildContainer,
+} from '../index';
 import { DailyChronicleInput, QueueItem, QueueState } from '../types';
 import { describeDropped, ClobberCheck } from '../utils/clobber.utils';
 import {
@@ -18,6 +22,7 @@ import { CHRONICLE_TOKENS } from '../tokens';
  *
  *   chronicle backfill   Generate and persist Chronicles for a date range.
  *   chronicle append-session   Append a single agent session to today's Chronicle.
+ *   chronicle inventory-chatgpt   Read-only ChatGPT export inventory (PRD-0027).
  *
  * Both write to the personal Chronicle repo (CHRONICLE_REPO env var or --repo flag).
  * Both are idempotent: content-hash dedup means re-running is safe.
@@ -27,6 +32,7 @@ const USAGE = `
 Usage:
   chronicle backfill [options]
   chronicle append-session [options]
+  chronicle inventory-chatgpt --export <path>
   chronicle queue [show] [--repo <path>]
   chronicle queue add "<title>" [--jira KEY] [--prd NNNN/N] [--due DATE] [--repo <path>]
   chronicle queue done "<title-or-id>" [--repo <path>]
@@ -43,6 +49,8 @@ Commands:
     add <title>       Add a new item to the Inbox.
     done <title|id>   Move an item to Done.
     list              List all items in a state.
+  inventory-chatgpt   Read-only inventory of a ChatGPT export directory or
+                      zip. Prints JSON. Does not write a Chronicle.
 
 Options:
   --repo <path>       Absolute path to your personal Chronicle repo.
@@ -63,6 +71,7 @@ Options:
   --prd <NNNN/N>      Attach a PRD phase reference (e.g. 0007/1).
   --due <YYYY-MM-DD>  Attach a due-date signal to a new queue item.
   --state <state>     Filter queue list by state (active|next|inbox|done).
+  --export <path>     ChatGPT export directory or .zip (inventory-chatgpt).
   -h, --help          Show this help.
 
 Environment variables:
@@ -89,6 +98,7 @@ interface ParsedArgs {
   prd?: string;
   due?: string;
   state?: QueueState;
+  exportPath?: string;
 }
 
 function parseArgs(argv: string[]): ParsedArgs {
@@ -165,6 +175,9 @@ function parseArgs(argv: string[]): ParsedArgs {
         break;
       case '--state':
         result.state = args[++i] as QueueState;
+        break;
+      case '--export':
+        result.exportPath = args[++i];
         break;
       case '-h':
       case '--help':
@@ -514,6 +527,15 @@ async function runQueue(args: ParsedArgs): Promise<void> {
   }
 }
 
+async function runInventoryChatgpt(args: ParsedArgs): Promise<void> {
+  const exportPath = args.exportPath;
+  if (!exportPath) die('--export <path> is required for inventory-chatgpt');
+  const handler = getChatGptInventoryHandler();
+  const inventory = await handler.handle({ exportPath });
+  console.log(JSON.stringify(inventory, null, 2));
+  if (inventory.status !== 'ok') process.exit(1);
+}
+
 async function main(): Promise<void> {
   const args = parseArgs(process.argv);
 
@@ -526,6 +548,9 @@ async function main(): Promise<void> {
       break;
     case 'queue':
       await runQueue(args);
+      break;
+    case 'inventory-chatgpt':
+      await runInventoryChatgpt(args);
       break;
     default:
       console.error(`chronicle: unknown command '${args.command}'\n`);

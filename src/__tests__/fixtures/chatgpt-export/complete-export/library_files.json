@@ -1,0 +1,17 @@
+[
+  {
+    "id": "lib-present",
+    "file_id": "file-fixture-present",
+    "file_name": "synthetic.png",
+    "file_extension": "png",
+    "deleted_at": null
+  },
+  {
+    "id": "lib-deleted",
+    "file_id": "file-deleted",
+    "file_name": "synthetic-deleted.pdf",
+    "file_extension": "pdf",
+    "deleted_at": 1700009000,
+    "deletion_reason": "user_deleted"
+  }
+]

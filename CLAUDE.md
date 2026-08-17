@@ -37,6 +37,7 @@ src/
 ├── tokens.ts                    CHRONICLE_TOKENS (Symbol.for)
 ├── types.ts                     boundary/DTO types (Activity, Evidence, DailyChronicle, Tag, …)
 ├── daily-chronicle.handler.ts   IDailyChronicleHandler / DailyChronicleHandler
+├── chatgpt-inventory.handler.ts IChatGptInventoryHandler (PRD-0027 Phase 1)
 ├── services/
 │   └── chronicle.service.ts     IChronicleService — synthesize sources → DailyChronicle
 ├── repositories/                one per source (interface + stub impl)

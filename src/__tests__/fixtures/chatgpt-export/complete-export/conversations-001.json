@@ -1,0 +1,84 @@
+[
+  {
+    "id": "conv-explicit-children",
+    "conversation_id": "conv-explicit-children",
+    "create_time": 1700006000,
+    "update_time": 1700006100,
+    "current_node": "node-ex-a",
+    "is_archived": false,
+    "title": "SYNTHETIC_TITLE_MUST_NOT_LEAK",
+    "mapping": {
+      "node-ex-root": {
+        "id": "node-ex-root",
+        "parent": null,
+        "children": ["node-ex-a", "node-ex-b"],
+        "message": null
+      },
+      "node-ex-a": {
+        "id": "node-ex-a",
+        "parent": "node-ex-root",
+        "children": [],
+        "message": {
+          "id": "msg-ex-a",
+          "author": { "role": "user" },
+          "create_time": 1700006001,
+          "content": { "content_type": "text", "parts": ["REDACTED_SHOULD_NOT_LEAK"] }
+        }
+      },
+      "node-ex-b": {
+        "id": "node-ex-b",
+        "parent": "node-ex-root",
+        "children": [],
+        "message": {
+          "id": "msg-ex-b",
+          "author": { "role": "assistant" },
+          "create_time": 1700006002,
+          "content": { "content_type": "text", "parts": ["REDACTED_SHOULD_NOT_LEAK"] }
+        }
+      }
+    }
+  },
+  {
+    "id": "conv-missing-timestamps",
+    "conversation_id": "conv-missing-timestamps",
+    "create_time": 1700007000,
+    "current_node": "node-ts-1",
+    "is_archived": false,
+    "title": "SYNTHETIC_TITLE_MUST_NOT_LEAK",
+    "mapping": {
+      "node-ts-root": {
+        "id": "node-ts-root",
+        "parent": null,
+        "message": null
+      },
+      "node-ts-1": {
+        "id": "node-ts-1",
+        "parent": "node-ts-root",
+        "message": {
+          "id": "msg-ts-1",
+          "author": { "role": "user" },
+          "content": { "content_type": "text", "parts": ["REDACTED_SHOULD_NOT_LEAK"] }
+        }
+      }
+    }
+  },
+  {
+    "id": "conv-malformed",
+    "conversation_id": "conv-malformed",
+    "create_time": 1700008000,
+    "is_archived": false,
+    "title": "SYNTHETIC_TITLE_MUST_NOT_LEAK",
+    "mapping": {
+      "bad-entry": "not-an-object",
+      "no-id": {
+        "parent": null,
+        "message": {
+          "author": { "role": "tool" },
+          "create_time": 1700008001,
+          "content": { "content_type": "unknown_widget", "parts": [] }
+        }
+      }
+    }
+  },
+  null
+]
