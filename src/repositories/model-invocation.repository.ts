@@ -4,6 +4,7 @@ import { ModelInvokeRequest, ModelInvokeResult } from '../types';
 
 const XAI_URL = 'https://api.x.ai/v1/responses';
 const LIVE_PROVIDER = 'xai';
+const XAI_MODEL = 'grok-4.6';
 const REASONING_EFFORT = 'high';
 const REQUEST_TIMEOUT_MS = 45_000;
 
@@ -53,6 +54,9 @@ export class ModelInvocationRepository implements IModelInvocationRepository {
     if (request.provider.trim().toLowerCase() !== LIVE_PROVIDER) {
       return { ok: false, failureClass: 'unavailable' };
     }
+    if (request.model.trim() !== XAI_MODEL) {
+      return { ok: false, failureClass: 'unavailable' };
+    }
     const apiKey = process.env['XAI_API_KEY'];
     if (!apiKey) {
       return { ok: false, failureClass: 'unavailable' };
@@ -76,7 +80,7 @@ export class ModelInvocationRepository implements IModelInvocationRepository {
           'content-type': 'application/json',
         },
         body: JSON.stringify({
-          model: request.model,
+          model: XAI_MODEL,
           input: request.prompt,
           reasoning_effort: REASONING_EFFORT,
           store: false,
@@ -135,9 +139,8 @@ export class ModelInvocationRepository implements IModelInvocationRepository {
     status: number,
   ): 'unavailable' | 'timeout' | 'refused' {
     if (status === 408 || status === 504) return 'timeout';
-    if (status === 400 || status === 401 || status === 403 || status === 422) {
-      return 'refused';
-    }
+    if (status === 401 || status === 403) return 'refused';
+    if (status === 400 || status === 422) return 'invalid-output';
     return 'unavailable';
   }
 }

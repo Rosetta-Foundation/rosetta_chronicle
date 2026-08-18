@@ -45,7 +45,7 @@ describe('ModelInvocationRepository', () => {
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
-  it('is unavailable without a key or for another provider', async () => {
+  it('is unavailable without a key, for another provider, or a mismatched model', async () => {
     const repo = new ModelInvocationRepository();
     await expect(
       repo.invoke({
@@ -55,6 +55,7 @@ describe('ModelInvocationRepository', () => {
       }),
     ).resolves.toEqual({ ok: false, failureClass: 'unavailable' });
     process.env['XAI_API_KEY'] = 'xai-test';
+    global.fetch = jest.fn();
     await expect(
       repo.invoke({
         provider: 'anthropic',
@@ -62,7 +63,14 @@ describe('ModelInvocationRepository', () => {
         prompt: 'SYNTHETIC',
       }),
     ).resolves.toEqual({ ok: false, failureClass: 'unavailable' });
-    expect(global.fetch).toBe(originalFetch);
+    await expect(
+      repo.invoke({
+        provider: 'xAI',
+        model: 'gpt-5',
+        prompt: 'SYNTHETIC',
+      }),
+    ).resolves.toEqual({ ok: false, failureClass: 'unavailable' });
+    expect(global.fetch).not.toHaveBeenCalled();
   });
 
   it('posts Responses API shape with grok-4.6 and high reasoning', async () => {
@@ -134,6 +142,18 @@ describe('ModelInvocationRepository', () => {
     });
     expect(refused).toEqual({ ok: false, failureClass: 'refused' });
     expect(JSON.stringify(refused)).not.toContain('SECRET_PROMPT');
+
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 400,
+    }) as unknown as typeof fetch;
+    await expect(
+      repo.invoke({
+        provider: 'xAI',
+        model: 'grok-4.6',
+        prompt: 'SECRET_PROMPT_MUST_NOT_LEAK',
+      }),
+    ).resolves.toEqual({ ok: false, failureClass: 'invalid-output' });
 
     global.fetch = jest.fn().mockRejectedValue(
       Object.assign(new Error('aborted'), { name: 'TimeoutError' }),
