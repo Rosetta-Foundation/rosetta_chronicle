@@ -31,7 +31,8 @@ import {
  *
  * Builds an in-memory view over existing stores and walks it backward
  * or forward. Does not persist a separate edge index, emit Activity, or
- * write Daily Chronicles. Partial walks keep broken cites visible.
+ * write Daily Chronicles. Status and failures describe the requested
+ * subgraph only — a broken cite elsewhere in the store is ignored.
  */
 export interface IProvenanceService {
   traverse(input: ProvenanceTraverseInput): Promise<ProvenanceTraverseResult>;
@@ -91,28 +92,51 @@ export class ProvenanceService implements IProvenanceService {
       };
     }
 
-    const hashes = this.collectHashes(input.start, derived, executions);
     const graphs = new Map<string, ChatGptSourceGraph>();
     const failures: ProvenanceFailure[] = [];
-    for (const hash of hashes) {
-      const graph = await this._graphStore.read(input.graphsDir, hash);
-      if (graph) {
-        graphs.set(hash, graph);
-        continue;
+    const attempted = new Set<string>();
+    let edges = buildProvenanceEdges({
+      executions,
+      derived,
+      graphs,
+    });
+    let paths = collectPaths(input.start, input.direction, edges, []);
+    let reachable = this.reachable(input.start, paths);
+
+    // Load only graphs that appear on this walk so a broken archive
+    // elsewhere in the store cannot mark a healthy subgraph partial.
+    // A second pass adds contains edges once a cited archive resolves.
+    for (;;) {
+      await this.loadReachableGraphs(
+        input.graphsDir,
+        reachable,
+        graphs,
+        attempted,
+        failures,
+      );
+      const next = buildProvenanceEdges({ executions, derived, graphs });
+      const walkFailures: ProvenanceFailure[] = [];
+      const nextPaths = collectPaths(
+        input.start,
+        input.direction,
+        next,
+        walkFailures,
+      );
+      const nextReachable = this.reachable(input.start, nextPaths);
+      const grew =
+        nextReachable.length !== reachable.length ||
+        nextReachable.some(
+          (ref) => !reachable.some((seen) => sameRef(seen, ref)),
+        );
+      edges = next;
+      paths = nextPaths;
+      reachable = nextReachable;
+      if (!grew) {
+        failures.push(...walkFailures);
+        break;
       }
-      const diagnosis = await this._graphStore.diagnose(input.graphsDir, hash);
-      failures.push({
-        code:
-          diagnosis === 'missing'
-            ? 'source-graph-missing'
-            : 'source-graph-invalid',
-        ref: ARCHIVE_REF(hash),
-      });
     }
 
-    const edges = buildProvenanceEdges({ executions, derived, graphs });
-    const paths = collectPaths(input.start, input.direction, edges, failures);
-    const reachable = this.reachable(input.start, paths);
     await this.auditCitations(input, reachable, failures);
 
     const nodes = sortNodes(this.resolveNodes(reachable, graphs, failures));
@@ -194,20 +218,38 @@ export class ProvenanceService implements IProvenanceService {
     );
   }
 
-  private collectHashes(
-    start: ProvenanceRef,
-    derived: DerivedRecord[],
-    executions: TransformationExecution[],
-  ): string[] {
+  private hashesFrom(refs: ProvenanceRef[]): string[] {
     const hashes = new Set<string>();
-    if (start.kind.startsWith('source-')) hashes.add(start.id.slice(0, 64));
-    for (const row of executions) {
-      for (const ref of row.sourceRefs) hashes.add(ref.sourceGraphHash);
-    }
-    for (const row of derived) {
-      for (const ref of row.sourceRefs) hashes.add(ref.sourceGraphHash);
+    for (const ref of refs) {
+      if (ref.kind.startsWith('source-')) hashes.add(ref.id.slice(0, 64));
     }
     return [...hashes].sort();
+  }
+
+  private async loadReachableGraphs(
+    graphsDir: string,
+    refs: ProvenanceRef[],
+    graphs: Map<string, ChatGptSourceGraph>,
+    attempted: Set<string>,
+    failures: ProvenanceFailure[],
+  ): Promise<void> {
+    for (const hash of this.hashesFrom(refs)) {
+      if (attempted.has(hash)) continue;
+      attempted.add(hash);
+      const graph = await this._graphStore.read(graphsDir, hash);
+      if (graph) {
+        graphs.set(hash, graph);
+        continue;
+      }
+      const diagnosis = await this._graphStore.diagnose(graphsDir, hash);
+      failures.push({
+        code:
+          diagnosis === 'missing'
+            ? 'source-graph-missing'
+            : 'source-graph-invalid',
+        ref: ARCHIVE_REF(hash),
+      });
+    }
   }
 
   private reachable(

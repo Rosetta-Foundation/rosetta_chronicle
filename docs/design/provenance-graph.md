@@ -103,6 +103,12 @@ definition, execution, derived record, graph, conversation, or node is
 `execution-missing`, `derived-missing`, `source-graph-missing`,
 `conversation-missing`, or `node-missing`.
 
+Failures describe the **requested subgraph**. A missing or invalid
+source graph, definition, execution, or derived record that is not
+reachable from `--from` does not change status. Stores are still
+scanned to build cites/produces edges; only artifacts on the walk are
+diagnosed.
+
 Cycles are not a valid domain shape. If corruption creates one, the
 walk records `cycle` and stops expanding that path.
 

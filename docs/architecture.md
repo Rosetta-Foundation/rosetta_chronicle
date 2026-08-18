@@ -83,6 +83,7 @@ definition, and graph stores. It builds an in-memory view and walks it
 backward or forward. An execution cites both its definition and its source
 material; it is not a linear SourceGraph → Definition → Execution chain.
 Direct `record-derived` notes participate without an execution.
+Failures describe the requested subgraph only.
 `transformation-provenance` stays the narrow compatibility helper. See
 `docs/design/provenance-graph.md`.
 

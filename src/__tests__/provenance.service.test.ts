@@ -30,6 +30,7 @@ const {
 } = require('../repositories/transformation-definition-store.repository');
 
 const HASH = 'b'.repeat(64);
+const HASH_B = 'd'.repeat(64);
 const CREATED = '2026-08-17T21:00:00.000Z';
 
 const graph = (): ChatGptSourceGraph => ({
@@ -348,6 +349,50 @@ describe('ProvenanceService', () => {
     expect(
       (fromDerived.failures as { code: string }[]).map((row) => row.code),
     ).toContain('node-missing');
+  });
+
+  it('isolates integrity failures to the requested subgraph', async () => {
+    const healthy = await transform.transform(
+      transformInput(outputDir, executionsDir, definitionsDir),
+    );
+    const broken = await transform.transform({
+      ...transformInput(outputDir, executionsDir, definitionsDir),
+      sourceGraphHash: HASH_B,
+      conversationId: 'conv-b',
+      nodeIds: ['nb'],
+      transformationType: 'reflection',
+      content: 'SYNTHETIC_DISCONNECTED_NOTE',
+    });
+    rmSync(broken.definitionPath as string);
+    writeFileSync(join(executionsDir, `${'e'.repeat(64)}.json`), '{');
+    writeFileSync(join(outputDir, `${'f'.repeat(64)}.json`), '{');
+
+    const fromA = await provenance.traverse({
+      ...dirs(),
+      start: {
+        kind: 'derived-record',
+        id: (healthy.derivedIds as string[])[0],
+      },
+      direction: 'backward',
+    });
+    expect(fromA.status).toBe('ok');
+    expect(fromA.failures).toEqual([]);
+    const aIds = (fromA.nodes as { id: string }[]).map((n) => n.id);
+    expect(aIds).not.toContain((broken.derivedIds as string[])[0]);
+    expect(aIds).not.toContain(HASH_B);
+
+    const fromB = await provenance.traverse({
+      ...dirs(),
+      start: {
+        kind: 'derived-record',
+        id: (broken.derivedIds as string[])[0],
+      },
+      direction: 'backward',
+    });
+    expect(fromB.status).toBe('partial');
+    expect(
+      (fromB.failures as { code: string }[]).map((row) => row.code).sort(),
+    ).toEqual(['definition-missing', 'source-graph-missing']);
   });
 
   it('orders nodes deterministically across repeated walks', async () => {
