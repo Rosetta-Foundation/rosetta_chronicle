@@ -205,7 +205,9 @@ Environment variables:
                       Default --occurrences for interpret-source.
   CHRONICLE_INTERPRET_MODEL_FIXTURE
                       Optional local JSON/text file used as the model
-                      body. No vendor SDK is bundled in E4a.
+                      body. Wins over a live provider.
+  XAI_API_KEY         Live Responses API key when --provider is xAI.
+                      Never persisted.
 `.trim();
 
 interface ParsedArgs {

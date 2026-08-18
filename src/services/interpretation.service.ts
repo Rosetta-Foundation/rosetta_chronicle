@@ -307,11 +307,17 @@ export class InterpretationService implements IInterpretationService {
     return { definition, sourceRefs, nodes: resolved.nodes };
   }
 
+  /**
+   * Execution/occurrence configuration. For xAI, `reasoningEffort`
+   * is the value the transport actually sends (`high`).
+   */
   private configuration(
     input: InterpretSourceInput,
   ): Record<string, unknown> {
+    const xai = input.provider.trim().toLowerCase() === 'xai';
     return {
       provider: input.provider,
+      ...(xai ? { reasoningEffort: 'high' } : {}),
       ...(input.temperature != null
         ? { temperature: input.temperature }
         : {}),

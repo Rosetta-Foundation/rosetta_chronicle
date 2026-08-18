@@ -121,6 +121,8 @@ Implemented:
 - first-class provenance graph traversal (backward and forward; partial integrity)
 - machine interpretation of explicitly cited ChatGPT nodes
   (`candidate-observation` / `interpret-source`; not Activity)
+- live xAI Responses HTTP transport for interpret-source
+  (`XAI_API_KEY`, `grok-4.6`, `reasoning_effort=high`; no vendor SDK)
 
 Not implemented:
 
@@ -130,7 +132,7 @@ Not implemented:
 - automatic summarization or reflection extraction
 - raw attachment persistence
 - generalized personal activity modeling
-- live vendor model SDK in this engine
+- a second live provider, Cursor agent transport, or a vendored SDK
 - bulk conversation scan / E4b private Specimen A
 
 ---
