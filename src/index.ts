@@ -29,6 +29,7 @@ import {
   IInterpretHandler,
   InterpretHandler,
 } from './interpret.handler';
+import { IEvaluateHandler, EvaluateHandler } from './evaluate.handler';
 import {
   IChronicleService,
   ChronicleService,
@@ -57,6 +58,10 @@ import {
   IInterpretationService,
   InterpretationService,
 } from './services/interpretation.service';
+import {
+  IEvaluationService,
+  EvaluationService,
+} from './services/evaluation.service';
 import { IGitRepository, GitRepository } from './repositories/git.repository';
 import {
   IGitDiscoveryRepository,
@@ -128,6 +133,10 @@ import {
   IModelInvocationRepository,
   ModelInvocationRepository,
 } from './repositories/model-invocation.repository';
+import {
+  IEvaluationStore,
+  EvaluationStore,
+} from './repositories/evaluation-store.repository';
 
 /**
  * Composition root. Wires the InversifyJS container and exposes a factory for
@@ -199,6 +208,9 @@ export const buildContainer = (): Container => {
       CHRONICLE_TOKENS.ModelInvocationRepository,
     )
     .to(ModelInvocationRepository);
+  container
+    .bind<IEvaluationStore>(CHRONICLE_TOKENS.EvaluationStore)
+    .to(EvaluationStore);
 
   // Services
   container
@@ -222,6 +234,9 @@ export const buildContainer = (): Container => {
   container
     .bind<IInterpretationService>(CHRONICLE_TOKENS.InterpretationService)
     .to(InterpretationService);
+  container
+    .bind<IEvaluationService>(CHRONICLE_TOKENS.EvaluationService)
+    .to(EvaluationService);
 
   // Handlers
   container
@@ -245,6 +260,9 @@ export const buildContainer = (): Container => {
   container
     .bind<IInterpretHandler>(CHRONICLE_TOKENS.InterpretHandler)
     .to(InterpretHandler);
+  container
+    .bind<IEvaluateHandler>(CHRONICLE_TOKENS.EvaluateHandler)
+    .to(EvaluateHandler);
 
   return container;
 };
@@ -295,5 +313,12 @@ export const getProvenanceHandler = (): IProvenanceHandler => {
 export const getInterpretHandler = (): IInterpretHandler => {
   return buildContainer().get<IInterpretHandler>(
     CHRONICLE_TOKENS.InterpretHandler,
+  );
+};
+
+/** Resolve the human-evaluation handler from a fresh container. */
+export const getEvaluateHandler = (): IEvaluateHandler => {
+  return buildContainer().get<IEvaluateHandler>(
+    CHRONICLE_TOKENS.EvaluateHandler,
   );
 };

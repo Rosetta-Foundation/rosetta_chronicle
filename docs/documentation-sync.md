@@ -128,6 +128,8 @@ Implemented:
   `not-committed`, second committed interpretation; sanitized
   result in `docs/design/interpretation-policy.md`; private source
   and observations are not in this repository)
+- append-only human evaluation of a derived record
+  (`evaluate-derived`; not current understanding, not Activity)
 
 Not implemented:
 
@@ -139,7 +141,7 @@ Not implemented:
 - generalized personal activity modeling
 - a second live provider, Cursor agent transport, or a vendored SDK
 - bulk conversation scan
-- durable human evaluation of machine interpretations (E5)
+- current-understanding view, biography, or profile materialization
 - general model reliability, multimodal coverage, or biography
 
 ---
@@ -194,7 +196,7 @@ Include:
 - read-only versus mutating behavior
 - failure behavior
 
-Keep inventory, import, and interpret-source separate.
+Keep inventory, import, interpret-source, and evaluate-derived separate.
 
 ---
 

@@ -45,6 +45,9 @@ const {
 const {
   SourceContentRepository,
 } = require('../repositories/source-content.repository');
+const {
+  EvaluationStore,
+} = require('../repositories/evaluation-store.repository');
 
 const FIXTURE = join(__dirname, 'fixtures/chatgpt-export/complete-export');
 const CREATED = '2026-08-18T12:00:00.000Z';
@@ -119,6 +122,7 @@ describe('InterpretationService', () => {
     container
       .bind(CHRONICLE_TOKENS.InterpretationService)
       .to(InterpretationService);
+    container.bind(CHRONICLE_TOKENS.EvaluationStore).to(EvaluationStore);
     container.bind(CHRONICLE_TOKENS.ProvenanceService).to(ProvenanceService);
     interpret = container.get(CHRONICLE_TOKENS.InterpretationService);
     provenance = container.get(CHRONICLE_TOKENS.ProvenanceService);

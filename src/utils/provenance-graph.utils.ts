@@ -1,5 +1,6 @@
 import {
   ChatGptSourceGraph,
+  DerivedEvaluation,
   DerivedRecord,
   DerivedSourceRef,
   ProvenanceDirection,
@@ -20,6 +21,7 @@ const NODE_KINDS: readonly ProvenanceNodeKind[] = [
   'transformation-definition',
   'transformation-execution',
   'derived-record',
+  'evaluation',
 ];
 
 const KIND_ALIASES: Record<string, ProvenanceNodeKind> = {
@@ -82,7 +84,8 @@ export const parseProvenanceFrom = (
     (kind === 'source-archive' ||
       kind === 'transformation-definition' ||
       kind === 'transformation-execution' ||
-      kind === 'derived-record') &&
+      kind === 'derived-record' ||
+      kind === 'evaluation') &&
     !CONTENT_HASH.test(id)
   ) {
     return { error: 'from-id-invalid' };
@@ -131,6 +134,7 @@ export const buildProvenanceEdges = (input: {
   executions: TransformationExecution[];
   derived: DerivedRecord[];
   graphs: Map<string, ChatGptSourceGraph>;
+  evaluations?: DerivedEvaluation[];
 }): ProvenanceEdge[] => {
   const edges: ProvenanceEdge[] = [];
   for (const [hash, graph] of [...input.graphs.entries()].sort(([a], [b]) =>
@@ -185,6 +189,31 @@ export const buildProvenanceEdges = (input: {
       }
     }
   }
+  for (const evaluation of input.evaluations ?? []) {
+    const from: ProvenanceRef = { kind: 'evaluation', id: evaluation.id };
+    edges.push(
+      edge('evaluates', from, {
+        kind: 'derived-record',
+        id: evaluation.evaluatedRecordId,
+      }),
+    );
+    if (evaluation.suppliedRecordId) {
+      edges.push(
+        edge('cites', from, {
+          kind: 'derived-record',
+          id: evaluation.suppliedRecordId,
+        }),
+      );
+    }
+    if (evaluation.precedingEvaluationId) {
+      edges.push(
+        edge('cites', from, {
+          kind: 'evaluation',
+          id: evaluation.precedingEvaluationId,
+        }),
+      );
+    }
+  }
   return dedupeEdges(edges);
 };
 
@@ -205,8 +234,10 @@ export const dedupeEdges = (edges: ProvenanceEdge[]): ProvenanceEdge[] => {
 
 /**
  * Neighbors in the walk direction.
- * Forward follows outgoing produces/contains and incoming cites.
- * Backward is the inverse — incoming produces/contains and outgoing cites.
+ * Forward follows outgoing produces/contains and incoming cites/evaluates.
+ * Backward is the inverse — incoming produces/contains and outgoing
+ * cites/evaluates. Stored `evaluates` points evaluation → derived;
+ * forward still discovers the evaluation from the derived record.
  */
 export const walkNeighbors = (
   current: ProvenanceRef,
@@ -217,19 +248,22 @@ export const walkNeighbors = (
   const structural =
     (item: ProvenanceEdge) =>
       item.type === 'produces' || item.type === 'contains';
+  const inverse =
+    (item: ProvenanceEdge) =>
+      item.type === 'cites' || item.type === 'evaluates';
   for (const item of edges) {
     if (direction === 'forward') {
       if (structural(item) && sameRef(item.from, current)) {
         found.push(item.to);
       }
-      if (item.type === 'cites' && sameRef(item.to, current)) {
+      if (inverse(item) && sameRef(item.to, current)) {
         found.push(item.from);
       }
     } else {
       if (structural(item) && sameRef(item.to, current)) {
         found.push(item.from);
       }
-      if (item.type === 'cites' && sameRef(item.from, current)) {
+      if (inverse(item) && sameRef(item.from, current)) {
         found.push(item.to);
       }
     }

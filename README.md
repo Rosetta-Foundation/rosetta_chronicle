@@ -49,7 +49,8 @@ bun run test    # jest (@swc/jest transform; type-checking happens in build)
 All TypeScript follows the **Handler / Service / Repository + InversifyJS** pattern that is mandatory
 across Rosetta. See the workspace rule at `../.claude/rules/architecture-hsr.md` and the summary in
 [`CLAUDE.md`](CLAUDE.md). ChatGPT export inventory, source-graph import, derived records,
-transformations, provenance walks, and machine interpretation (`interpret-source`)
+transformations, provenance walks, machine interpretation (`interpret-source`),
+and append-only human evaluation (`evaluate-derived`)
 are documented under [`docs/design/`](docs/design/).
 The memory-publication invariant for machine output lives in
 [`docs/design/interpretation-policy.md`](docs/design/interpretation-policy.md).

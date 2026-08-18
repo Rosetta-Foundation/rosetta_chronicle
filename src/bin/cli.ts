@@ -8,6 +8,7 @@ import {
   getTransformationHandler,
   getProvenanceHandler,
   getInterpretHandler,
+  getEvaluateHandler,
   buildContainer,
 } from '../index';
 import {
@@ -15,6 +16,8 @@ import {
   DerivedProducerType,
   DerivedReviewState,
   DerivedTransformationType,
+  EvidenceSupport,
+  PersonalRecognition,
   ProvenanceDirection,
   QueueItem,
   QueueState,
@@ -45,6 +48,7 @@ import { CHRONICLE_TOKENS } from '../tokens';
  *                                 Walk or compare transformation executions.
  *   chronicle provenance          First-class backward/forward graph walk.
  *   chronicle interpret-source    Machine interpretation with provenance (E4).
+ *   chronicle evaluate-derived    Append-only human evaluation of a derived record.
  *
  * Daily Chronicle commands write to the personal Chronicle repo
  * (CHRONICLE_REPO env var or --repo flag) and are idempotent by content hash.
@@ -66,6 +70,7 @@ Usage:
   chronicle transformation-provenance --compare <id> --with <id> --executions <dir>
   chronicle provenance --from <kind>:<id> --direction backward|forward --graphs <dir> --output <dir> --executions <dir> --definitions <dir>
   chronicle interpret-source --type candidate-observation --export <path> --graph <file> --source-graph-hash <hex> --conversation-id <id> --node-id <id> --output <dir> --executions <dir> --definitions <dir> --occurrences <dir> --provider <name> --model <id> [--dry-run]
+  chronicle evaluate-derived --derived <id> --evaluator-name <name> [--evidence-support supported|not-supported|uncertain] [--personal-recognition recognized|rejected|uncertain] --evaluations <dir> --output <dir> [--dry-run]
   chronicle queue [show] [--repo <path>]
   chronicle queue add "<title>" [--jira KEY] [--prd NNNN/N] [--due DATE] [--repo <path>]
   chronicle queue done "<title-or-id>" [--repo <path>]
@@ -105,6 +110,12 @@ Commands:
                       Activity. Output begins unreviewed. Default stdout
                       omits source text and observation statements.
                       --dry-run validates only (no provider, no writes).
+  evaluate-derived    Append-only human evaluation of one derived record.
+                      Does not mutate the evaluated record. At least one
+                      of --evidence-support or --personal-recognition is
+                      required. Default stdout omits evaluation note
+                      prose. Does not emit Activity. --dry-run validates
+                      only (no writes).
 
 Options:
   --repo <path>       Absolute path to your personal Chronicle repo.
@@ -193,7 +204,7 @@ Environment variables:
                       for provenance.
   CHRONICLE_DERIVED_DIR
                       Default --output for record-derived,
-                      transform-record, and provenance.
+                      transform-record, evaluate-derived, and provenance.
   CHRONICLE_EXECUTION_DIR
                       Default --executions for transform-record,
                       transformation-provenance, and provenance.
@@ -203,6 +214,9 @@ Environment variables:
                       interpret-source.
   CHRONICLE_OCCURRENCE_DIR
                       Default --occurrences for interpret-source.
+  CHRONICLE_EVALUATION_DIR
+                      Default --evaluations for evaluate-derived and
+                      provenance.
   CHRONICLE_INTERPRET_MODEL_FIXTURE
                       Optional local JSON/text file used as the model
                       body. Wins over a live provider.
@@ -258,6 +272,14 @@ interface ParsedArgs {
   occurrencesDir?: string;
   provider?: string;
   temperature?: number;
+  evaluationsDir?: string;
+  evaluatorName?: string;
+  evaluatorType?: string;
+  evidenceSupport?: string;
+  personalRecognition?: string;
+  suppliedRecordId?: string;
+  precedingEvaluationId?: string;
+  evaluatedAt?: string;
 }
 
 function parseArgs(argv: string[]): ParsedArgs {
@@ -430,6 +452,33 @@ function parseArgs(argv: string[]): ParsedArgs {
         break;
       case '--review-state':
         result.reviewState = args[++i];
+        break;
+      case '--evaluations':
+        result.evaluationsDir = args[++i];
+        break;
+      case '--evaluator-name':
+        result.evaluatorName = args[++i];
+        break;
+      case '--evaluator-type':
+        result.evaluatorType = args[++i];
+        break;
+      case '--evidence-support':
+        result.evidenceSupport = args[++i];
+        break;
+      case '--personal-recognition':
+        result.personalRecognition = args[++i];
+        break;
+      case '--note':
+        result.content = args[++i];
+        break;
+      case '--supplied-record':
+        result.suppliedRecordId = args[++i];
+        break;
+      case '--preceding-evaluation':
+        result.precedingEvaluationId = args[++i];
+        break;
+      case '--evaluated-at':
+        result.evaluatedAt = args[++i];
         break;
       case '-h':
       case '--help':
@@ -987,6 +1036,13 @@ async function runProvenance(args: ParsedArgs): Promise<void> {
     die(
       '--graphs <dir> (or $CHRONICLE_SOURCE_GRAPH_DIR) is required for provenance',
     );
+  const evaluationsDir =
+    args.evaluationsDir ?? process.env['CHRONICLE_EVALUATION_DIR'];
+  if (parsed.ref.kind === 'evaluation' && !evaluationsDir) {
+    die(
+      '--evaluations <dir> (or $CHRONICLE_EVALUATION_DIR) is required when --from is evaluation:',
+    );
+  }
   const handler = getProvenanceHandler();
   const result = await handler.handle({
     start: parsed.ref,
@@ -995,6 +1051,7 @@ async function runProvenance(args: ParsedArgs): Promise<void> {
     outputDir,
     executionsDir,
     definitionsDir,
+    ...(evaluationsDir ? { evaluationsDir } : {}),
   });
   console.log(JSON.stringify(result, null, 2));
   if (result.status === 'invalid' || result.status === 'not-found') {
@@ -1087,6 +1144,63 @@ async function runInterpretSource(args: ParsedArgs): Promise<void> {
   }
 }
 
+async function runEvaluateDerived(args: ParsedArgs): Promise<void> {
+  if (args.evaluatorType && args.evaluatorType !== 'human') {
+    die('evaluate-derived accepts human evaluators only');
+  }
+  if (!args.derivedId) {
+    die('--derived <id> is required for evaluate-derived');
+  }
+  if (!args.evaluatorName) {
+    die('--evaluator-name <name> is required for evaluate-derived');
+  }
+  const outputDir = args.outputDir ?? process.env['CHRONICLE_DERIVED_DIR'];
+  if (!outputDir) {
+    die(
+      '--output <dir> (or $CHRONICLE_DERIVED_DIR) is required for evaluate-derived',
+    );
+  }
+  const evaluationsDir =
+    args.evaluationsDir ?? process.env['CHRONICLE_EVALUATION_DIR'];
+  if (!evaluationsDir) {
+    die(
+      '--evaluations <dir> (or $CHRONICLE_EVALUATION_DIR) is required for evaluate-derived',
+    );
+  }
+  const handler = getEvaluateHandler();
+  const result = await handler.handle({
+    outputDir,
+    evaluationsDir,
+    evaluatedRecordId: args.derivedId,
+    evaluatorName: args.evaluatorName,
+    ...(args.evidenceSupport
+      ? { evidenceSupport: args.evidenceSupport as EvidenceSupport }
+      : {}),
+    ...(args.personalRecognition
+      ? {
+          personalRecognition: args.personalRecognition as PersonalRecognition,
+        }
+      : {}),
+    ...(args.content ? { note: args.content } : {}),
+    ...(args.suppliedRecordId
+      ? { suppliedRecordId: args.suppliedRecordId }
+      : {}),
+    ...(args.precedingEvaluationId
+      ? { precedingEvaluationId: args.precedingEvaluationId }
+      : {}),
+    ...(args.evaluatedAt ? { evaluatedAt: args.evaluatedAt } : {}),
+    dryRun: args.dryRun,
+  });
+  console.log(JSON.stringify(result, null, 2));
+  if (
+    result.status !== 'recorded' &&
+    result.status !== 'already-present' &&
+    result.status !== 'dry-run'
+  ) {
+    process.exit(1);
+  }
+}
+
 async function main(): Promise<void> {
   const args = parseArgs(process.argv);
 
@@ -1120,6 +1234,9 @@ async function main(): Promise<void> {
       break;
     case 'interpret-source':
       await runInterpretSource(args);
+      break;
+    case 'evaluate-derived':
+      await runEvaluateDerived(args);
       break;
     default:
       console.error(`chronicle: unknown command '${args.command}'\n`);

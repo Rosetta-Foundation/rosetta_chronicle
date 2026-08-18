@@ -401,6 +401,6 @@ promote, does not accept `--review-state` or `--content`.
 - Review CLI
 - Attachment-lineage walk
 - Vendor SDK / Cursor agent transport / a second live provider
-- Human evaluation as a durable Chronicle event (E5)
+- Human evaluation mechanics (see `docs/design/evaluation.md`)
 - Private E4b source or observation text in this repository
 - Redesigning provenance `partial`
