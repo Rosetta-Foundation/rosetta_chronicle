@@ -365,6 +365,7 @@ describe('InterpretationService', () => {
     const result = await interpret.interpret(base());
     expect(result.status).toBe('unavailable');
     expect(result.providerStatus).toBe('failed');
+    expect(result.providerFailureClass).toBe('unavailable');
     expect(result.persistenceStatus).toBe('not-committed');
     expect(result.outcome).toBeUndefined();
     expect(readdirSync(outputDir)).toEqual([]);
@@ -487,6 +488,56 @@ describe('InterpretationService', () => {
     expect(second.derivedIds).toEqual(first.derivedIds);
     expect(second.occurrenceId).toBeUndefined();
     expect(readdirSync(occurrencesDir)).toHaveLength(1);
+  });
+
+  it('says the receipt failed when unavailable and occurrence write fails', async () => {
+    model.invoke.mockResolvedValue({
+      ok: false,
+      failureClass: 'unavailable',
+    });
+    bind(model, {
+      read: async () => null,
+      write: async () => {
+        throw new Error('disk-full');
+      },
+      pathFor: (dir: string, id: string) => join(dir, `${id}.json`),
+    });
+    const result = await interpret.interpret(base());
+    expect(result.status).toBe('occurrence-persist-failed');
+    expect(result.error).toBe('occurrence-persist-failed');
+    expect(result.providerStatus).toBe('failed');
+    expect(result.providerFailureClass).toBe('unavailable');
+    expect(result.persistenceStatus).toBe('not-committed');
+    expect(result.occurrenceId).toBeUndefined();
+    expect(result.executionId).toBeUndefined();
+    expect(result.derivedIds).toBeUndefined();
+    expect(readdirSync(executionsDir)).toEqual([]);
+    expect(readdirSync(outputDir)).toEqual([]);
+    expect(readdirSync(occurrencesDir)).toEqual([]);
+  });
+
+  it('says the receipt failed when timeout is uncertain and occurrence write fails', async () => {
+    model.invoke.mockResolvedValue({
+      ok: false,
+      failureClass: 'timeout',
+    });
+    bind(model, {
+      read: async () => null,
+      write: async () => {
+        throw new Error('disk-full');
+      },
+      pathFor: (dir: string, id: string) => join(dir, `${id}.json`),
+    });
+    const result = await interpret.interpret(base());
+    expect(result.status).toBe('occurrence-persist-failed');
+    expect(result.error).toBe('occurrence-persist-failed');
+    expect(result.providerStatus).toBe('uncertain');
+    expect(result.providerFailureClass).toBe('timeout');
+    expect(result.persistenceStatus).toBe('not-committed');
+    expect(result.occurrenceId).toBeUndefined();
+    expect(readdirSync(executionsDir)).toEqual([]);
+    expect(readdirSync(outputDir)).toEqual([]);
+    expect(readdirSync(occurrencesDir)).toEqual([]);
   });
 
   it('writes execution before derived and leaves no orphan on derived persist failure', async () => {

@@ -451,24 +451,19 @@ export class InterpretationService implements IInterpretationService {
         occurrence,
       );
     } catch {
-      const interpretationCommitted =
-        input.persistenceStatus === 'committed';
       return {
-        status: interpretationCommitted
-          ? 'occurrence-persist-failed'
-          : input.status,
+        status: 'occurrence-persist-failed',
         definitionId: input.definition.id,
         executionId: input.executionId,
         derivedIds: input.derivedIds,
         providerStatus: input.providerStatus,
         persistenceStatus: input.persistenceStatus,
         outcome: input.outcome,
+        providerFailureClass: input.providerFailureClass,
         observationCount: input.observationCount,
         epistemicClasses: input.epistemicClasses,
         reviewState: input.reviewState,
-        error: interpretationCommitted
-          ? 'occurrence-persist-failed'
-          : (input.error ?? 'occurrence-persist-failed'),
+        error: 'occurrence-persist-failed',
       };
     }
     return {
@@ -480,6 +475,7 @@ export class InterpretationService implements IInterpretationService {
       providerStatus: input.providerStatus,
       persistenceStatus: input.persistenceStatus,
       outcome: input.outcome,
+      providerFailureClass: input.providerFailureClass,
       observationCount: input.observationCount,
       epistemicClasses: input.epistemicClasses,
       reviewState: input.reviewState,

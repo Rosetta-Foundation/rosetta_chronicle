@@ -749,6 +749,7 @@ export interface InterpretSourceResult {
   providerStatus?: ProviderStatus;
   persistenceStatus?: PersistenceStatus;
   outcome?: ExecutionOccurrenceOutcome;
+  providerFailureClass?: ProviderFailureClass;
   resolvedNodeCount?: number;
   error?: string;
 }

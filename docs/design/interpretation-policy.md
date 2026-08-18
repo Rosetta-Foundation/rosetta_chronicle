@@ -165,19 +165,26 @@ No occurrence if the provider was never called (dry-run, unresolved
 source). Crash before a terminal provider result = no occurrence
 (accepted gap).
 
-If the occurrence receipt fails after execution + derived are durable:
+Any occurrence-store write failure is:
 
 ```text
 status = occurrence-persist-failed
-providerStatus = succeeded
-persistenceStatus = committed
-executionId / derivedIds present
+providerStatus = failed | uncertain | succeeded
+providerFailureClass = …   (when the provider did not succeed)
+persistenceStatus = committed | not-committed
+error = occurrence-persist-failed
 occurrenceId absent
 ```
 
-The command exits nonzero. It must not report `not-committed` — the
-interpretation is already Chronicle memory. The same status is used
-for a newly recorded interpretation and an `already-present` retry.
+Top-level `status` says the command failed to durably record the
+receipt. The structured fields keep the provider result.
+
+If the interpretation was already Chronicle memory, `persistenceStatus`
+stays `committed` and `executionId` / `derivedIds` stay present. If the
+provider failed or was uncertain, there is no execution or derived
+file — the lost occurrence was the only durable proof the invoke
+happened, and the result must say the receipt failed rather than
+merely `unavailable` / `uncertain`.
 
 ## Crash states (append-only, not transactional)
 
