@@ -237,9 +237,12 @@ Chronicle does not vendor a provider SDK and does not depend on
 `sdlc-workflow`. Transport order:
 
 1. `CHRONICLE_INTERPRET_MODEL_FIXTURE` if the file exists
-2. one xAI Responses HTTP call when `--provider` is `xAI` and
-   `XAI_API_KEY` is set (`model` `grok-4.6`, `reasoning_effort` `high`,
-   `store` false, search off)
+2. one xAI Responses HTTP call when `--provider` is `xAI`, the
+   requested model is exactly `grok-4.6`, and `XAI_API_KEY` is set
+   (`reasoning_effort` `high`, `store` false, no tools, no
+   `search_parameters`). Any other model on this provider is
+   `unavailable`. `search_parameters` is omitted because xAI
+   deprecates that field with HTTP 410.
 3. otherwise `unavailable`
 
 The live call returns response text plus `providerRequestId` /
