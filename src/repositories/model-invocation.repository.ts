@@ -137,7 +137,7 @@ export class ModelInvocationRepository implements IModelInvocationRepository {
 
   private failureClassForStatus(
     status: number,
-  ): 'unavailable' | 'timeout' | 'refused' {
+  ): 'unavailable' | 'timeout' | 'refused' | 'invalid-output' {
     if (status === 408 || status === 504) return 'timeout';
     if (status === 401 || status === 403) return 'refused';
     if (status === 400 || status === 422) return 'invalid-output';
