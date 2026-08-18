@@ -37,4 +37,12 @@ describe('DerivedRecordStore', () => {
     const read = await store.read(outputDir, ID);
     expect(read?.content).toBe('SYNTHETIC_DERIVED_NOTE');
   });
+
+  it('lists derived records and skips non-derived files', async () => {
+    const store = new DerivedRecordStore();
+    await store.write(outputDir, record());
+    const listed = await store.list(outputDir);
+    expect(listed).toHaveLength(1);
+    expect(listed[0].id).toBe(ID);
+  });
 });

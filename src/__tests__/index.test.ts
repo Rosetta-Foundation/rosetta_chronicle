@@ -6,6 +6,7 @@ import {
   getDailyChronicleHandler,
   getDerivedRecordHandler,
   getTransformationHandler,
+  getProvenanceHandler,
 } from '../index';
 import { CHRONICLE_TOKENS } from '../tokens';
 
@@ -70,5 +71,13 @@ describe('getTransformationHandler', () => {
     expect(handler).toBeDefined();
     expect(typeof handler.handle).toBe('function');
     expect(typeof handler.provenance).toBe('function');
+  });
+});
+
+describe('getProvenanceHandler', () => {
+  it('resolves the provenance handler with its dependency graph', () => {
+    const handler = getProvenanceHandler();
+    expect(handler).toBeDefined();
+    expect(typeof handler.handle).toBe('function');
   });
 });

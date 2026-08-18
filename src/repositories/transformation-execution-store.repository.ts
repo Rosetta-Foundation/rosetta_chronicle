@@ -16,11 +16,17 @@ import { TransformationExecution } from '../types';
  * supplies the directory. Does not encode a personal Chronicle layout,
  * emit Activity, or touch Daily Chronicle files.
  */
+export type ExecutionResolveStatus = 'ok' | 'missing' | 'invalid';
+
 export interface ITransformationExecutionStore {
   read(
     executionsDir: string,
     id: string,
   ): Promise<TransformationExecution | null>;
+  diagnose(
+    executionsDir: string,
+    id: string,
+  ): Promise<ExecutionResolveStatus>;
   write(
     executionsDir: string,
     execution: TransformationExecution,
@@ -75,6 +81,18 @@ export class TransformationExecutionStore
     } catch {
       return null;
     }
+  }
+
+  /** @inheritDoc */
+  async diagnose(
+    executionsDir: string,
+    id: string,
+  ): Promise<ExecutionResolveStatus> {
+    if (!RECORD_ID.test(id)) return 'invalid';
+    const absPath = this.pathFor(executionsDir, id);
+    if (!existsSync(absPath)) return 'missing';
+    const loaded = await this.read(executionsDir, id);
+    return loaded ? 'ok' : 'invalid';
   }
 
   /** @inheritDoc */

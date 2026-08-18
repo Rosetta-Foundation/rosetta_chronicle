@@ -22,6 +22,10 @@ import {
   TransformationHandler,
 } from './transformation.handler';
 import {
+  IProvenanceHandler,
+  ProvenanceHandler,
+} from './provenance.handler';
+import {
   IChronicleService,
   ChronicleService,
 } from './services/chronicle.service';
@@ -41,6 +45,10 @@ import {
   ITransformationService,
   TransformationService,
 } from './services/transformation.service';
+import {
+  IProvenanceService,
+  ProvenanceService,
+} from './services/provenance.service';
 import { IGitRepository, GitRepository } from './repositories/git.repository';
 import {
   IGitDiscoveryRepository,
@@ -177,6 +185,9 @@ export const buildContainer = (): Container => {
   container
     .bind<ITransformationService>(CHRONICLE_TOKENS.TransformationService)
     .to(TransformationService);
+  container
+    .bind<IProvenanceService>(CHRONICLE_TOKENS.ProvenanceService)
+    .to(ProvenanceService);
 
   // Handlers
   container
@@ -194,6 +205,9 @@ export const buildContainer = (): Container => {
   container
     .bind<ITransformationHandler>(CHRONICLE_TOKENS.TransformationHandler)
     .to(TransformationHandler);
+  container
+    .bind<IProvenanceHandler>(CHRONICLE_TOKENS.ProvenanceHandler)
+    .to(ProvenanceHandler);
 
   return container;
 };
@@ -230,5 +244,12 @@ export const getDerivedRecordHandler = (): IDerivedRecordHandler => {
 export const getTransformationHandler = (): ITransformationHandler => {
   return buildContainer().get<ITransformationHandler>(
     CHRONICLE_TOKENS.TransformationHandler,
+  );
+};
+
+/** Resolve the provenance-graph handler from a fresh container. */
+export const getProvenanceHandler = (): IProvenanceHandler => {
+  return buildContainer().get<IProvenanceHandler>(
+    CHRONICLE_TOKENS.ProvenanceHandler,
   );
 };

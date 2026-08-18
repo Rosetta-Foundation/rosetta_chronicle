@@ -14,6 +14,7 @@ export const CHRONICLE_TOKENS = {
   ChatGptImportHandler: Symbol.for('ChatGptImportHandler'),
   DerivedRecordHandler: Symbol.for('DerivedRecordHandler'),
   TransformationHandler: Symbol.for('TransformationHandler'),
+  ProvenanceHandler: Symbol.for('ProvenanceHandler'),
 
   // Services
   ChronicleService: Symbol.for('ChronicleService'),
@@ -21,6 +22,7 @@ export const CHRONICLE_TOKENS = {
   ChatGptImportService: Symbol.for('ChatGptImportService'),
   DerivedRecordService: Symbol.for('DerivedRecordService'),
   TransformationService: Symbol.for('TransformationService'),
+  ProvenanceService: Symbol.for('ProvenanceService'),
 
   // Repositories (one per source)
   GitRepository: Symbol.for('GitRepository'),
