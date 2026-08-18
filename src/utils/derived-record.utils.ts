@@ -109,7 +109,11 @@ export const validateSourceRefsOnGraph = (
   return errors;
 };
 
-/** Stable id: refs + type + version + producer + content hash. Not createdAt. */
+/**
+ * Immutable transformation-event id: refs + type + version + producer +
+ * content hash. Not createdAt (same event if re-recorded). Not a
+ * conceptual artifact id — a different body or producer is a new event.
+ */
 export const derivedRecordId = (
   sourceRefs: DerivedSourceRef[],
   transformationType: DerivedTransformationType,

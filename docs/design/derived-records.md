@@ -54,14 +54,41 @@ is human-created. AI output, when it arrives, is the same shape: a
 transformation with identity, timestamp, source refs, and review state —
 not truth.
 
+## Identity — immutable transformation event
+
+`DerivedRecord.id` identifies an **immutable transformation event**, not
+a persistent conceptual artifact.
+
+| | Immutable transformation event (this phase) | Persistent conceptual artifact (not this phase) |
+| --- | --- | --- |
+| The id means | This producer made this content from these refs, as this type/version | "The reflection about conversation X" that can be updated |
+| Same payload again | Same event (`already-present`; first `createdAt` kept) | Would be a write to the same artifact |
+| Content or producer changes | A **new** event with a new id | Same id, mutated body |
+| Current meaning | A later view over a sequence of events | The latest row for that id |
+
+The id is the SHA-256 of `{ sourceRefs, transformationType,
+transformationVersion, createdBy, contentRef }`. `createdAt` is not in
+the id: repeating the same transformation is the same event, not a
+second one. Changing content, producer, refs, type, or version is a
+different event.
+
+A living concept — "my current reading of this conversation," "the
+decision we are working with" — is **not** the derived record. Those
+are later materialized views over an append-only sequence of events
+(and, in Phase 3–4, evaluations and path links). This phase does not
+give a derived record a stable conceptual identity that survives edits.
+
+`reviewState` on the event is a seed, not a license to mutate the
+event's meaning in place.
+
 ## 2. How is it different from source data?
 
 | | Source graph | Derived record |
 | --- | --- | --- |
 | Answers | What was the structure? | What was made of it? |
-| Identity | Archive content hash | Transformation id (hash of refs + type + producer + content) |
+| Identity | Archive content hash | Immutable transformation-event id (refs + type + version + producer + content) |
 | Content | No message text / titles | Optional human (or later AI) body via `contentRef` |
-| Mutability | Idempotent re-import keeps first `importedAt` | Append-only; a new derivation is a new record |
+| Mutability | Idempotent re-import keeps first `importedAt` | Append-only events; edits are new records, not updates |
 | Completeness | Missing attachments stay as refs | Cannot exist without `sourceRefs` |
 
 The graph is not an archive backup. The derived record is not a graph
@@ -151,7 +178,7 @@ flow.
 
 ```ts
 interface DerivedRecord {
-  id: string;                          // sha256 of stable fields
+  id: string;                          // immutable event id (not a conceptual artifact)
   sourceRefs: DerivedSourceRef[];
   transformationType: DerivedTransformationType;
   transformationVersion: string;       // 'derived-record/1'

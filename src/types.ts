@@ -477,10 +477,14 @@ export interface DerivedSourceRef {
 
 /**
  * Inspectable transformation from a source graph. Not Activity, not a
- * graph backup. Content is optional so a private store can hold the body
- * while `contentRef` remains the durable handle.
+ * graph backup. `id` is an immutable transformation *event* (this
+ * producer, this content, these refs, this type/version) — not a
+ * persistent conceptual artifact that can be edited in place. Content
+ * is optional so a private store can hold the body while `contentRef`
+ * remains the durable handle.
  */
 export interface DerivedRecord {
+  /** Immutable event id; not a living conceptual identity. */
   id: string;
   sourceRefs: DerivedSourceRef[];
   transformationType: DerivedTransformationType;
