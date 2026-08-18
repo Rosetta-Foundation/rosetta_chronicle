@@ -167,3 +167,22 @@ summarize.
 - `ActivitySource` membership / Daily Chronicle synthesis
 - Organizational promotion
 - Nondeterministic registered AI recipes
+
+## Future considerations
+
+Neither of these is required for this phase. They are recorded so the
+path stays visible.
+
+1. **Persisted recipe definitions.** `TransformationDefinition` is an
+   in-process catalog today. Historical executions resolve type +
+   version against whatever the engine currently registers. If recipes
+   evolve in place, consider persisting and versioning the definition
+   itself so an old execution can load the exact recipe that existed
+   at run time.
+
+2. **Two kinds of derived record.** `executionId` is optional because
+   `record-derived` (directly authored) and `transform-record`
+   (recipe-produced) both write `DerivedRecord`. If transformation
+   usage becomes the common path, consider whether those should
+   become separate domain concepts rather than one type with an
+   optional link.
