@@ -159,3 +159,4 @@ not change the original `importedAt`.
 - `ActivitySource` membership
 - Daily Chronicle synthesis
 - Reflections, path links, promotion
+- Interpreting message text (see `docs/design/interpretation-policy.md`)

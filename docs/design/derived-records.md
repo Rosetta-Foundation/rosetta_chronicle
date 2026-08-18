@@ -47,12 +47,20 @@ answers "what did someone (or a later agent) make of this path?" without
 replacing the path.
 
 Examples of *kind* (not all implemented as generators): summary,
-reflection, insight, decision, activity candidate, human note.
+reflection, insight, decision, activity candidate, human note,
+candidate observation.
 
-This phase implements the **record**, not automatic generation. Content
-is human-created. AI output, when it arrives, is the same shape: a
-transformation with identity, timestamp, source refs, and review state —
-not truth.
+This phase implements the **record**, not automatic generation for
+caller-supplied types. Content on `record-derived` /
+`transform-record` is human-created (or caller-supplied agent content).
+Machine interpretation of cited ChatGPT nodes is a separate command
+(`chronicle interpret-source`) and a separate type
+(`candidate-observation`). See `docs/design/interpretation-policy.md`.
+
+AI output, when published, is the same DerivedRecord shape: a
+transformation with identity, timestamp, source refs, and review state
+— not truth. **A durable DerivedRecord is accepted Chronicle memory.**
+The model returning an answer is not when that answer becomes memory.
 
 ## Identity — immutable transformation event
 
@@ -105,7 +113,7 @@ A derived record keeps:
 
 - graph-level provenance (hash, conversation, nodes)
 - transformation type and version
-- producer identity (human vs agent, model, prompt version)
+- producer identity (human vs agent, model; optional prompt version)
 - confidence and review state
 - content as a hashed ref, not a flattened daily summary
 
@@ -132,7 +140,10 @@ the record — the graph may live in another caller-chosen directory.
 Provenance is structural. It is not inferred from timestamps or
 directory proximity. Graph walks over these cites live on
 `chronicle provenance` (`docs/design/provenance-graph.md`). Direct
-`record-derived` notes participate without an execution.
+`record-derived` notes participate without an execution. Machine
+interpretation participates as `source → execution → derived`. Those
+two shapes must not be collapsed. `candidate-observation` is rejected
+on `record-derived` / `transform-record`.
 
 ## 5. How are transformations versioned?
 
@@ -141,8 +152,10 @@ for this phase). Changing the id algorithm or required fields bumps
 the version. The version is part of the stable id input so two
 versions of the same human note are distinct records, not overwrites.
 
-Later AI transformations add `createdBy.model` and
-`createdBy.promptVersion` under the same versioning rule.
+Later AI transformations add `createdBy.model` under the same
+versioning rule. Machine interpretation (`candidate-observation`) does
+not set `createdBy.promptVersion`; template identity lives on the
+definition policy and execution configuration.
 
 ## 6. How are human edits represented?
 
@@ -159,6 +172,8 @@ Edits are **new derived records**, not in-place rewrites.
 
 Human-authored content defaults to `recognized`. Agent-authored
 content defaults to `unreviewed` and requires a model identity.
+`interpret-source` always writes `unreviewed` and does not accept
+`--review-state`.
 
 ## 7. How does privacy boundary enforcement work?
 
@@ -206,9 +221,11 @@ chronicle record-derived --output <dir> \
   --content <text>
 ```
 
-`record-derived` persists the event only. To record the process as well,
-use `chronicle transform-record` (see
-`docs/design/transformation-registry.md`).
+`record-derived` persists the event only. To record a caller-supplied
+process as well, use `chronicle transform-record` (see
+`docs/design/transformation-registry.md`). Machine interpretation of
+cited source nodes is `chronicle interpret-source` (see
+`docs/design/interpretation-policy.md`).
 
 Does not emit Activity, does not write a Daily Chronicle, does not
 promote.
@@ -220,3 +237,4 @@ promote.
 - Organizational promotion
 - Full `ReflectiveRecord` / `PathLink` model
 - Source-vault policy
+- Caller-supplied `candidate-observation` (interpret-source only)

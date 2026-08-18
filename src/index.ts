@@ -26,6 +26,10 @@ import {
   ProvenanceHandler,
 } from './provenance.handler';
 import {
+  IInterpretHandler,
+  InterpretHandler,
+} from './interpret.handler';
+import {
   IChronicleService,
   ChronicleService,
 } from './services/chronicle.service';
@@ -49,6 +53,10 @@ import {
   IProvenanceService,
   ProvenanceService,
 } from './services/provenance.service';
+import {
+  IInterpretationService,
+  InterpretationService,
+} from './services/interpretation.service';
 import { IGitRepository, GitRepository } from './repositories/git.repository';
 import {
   IGitDiscoveryRepository,
@@ -108,6 +116,18 @@ import {
   ITransformationExecutionStore,
   TransformationExecutionStore,
 } from './repositories/transformation-execution-store.repository';
+import {
+  IExecutionOccurrenceStore,
+  ExecutionOccurrenceStore,
+} from './repositories/execution-occurrence-store.repository';
+import {
+  ISourceContentRepository,
+  SourceContentRepository,
+} from './repositories/source-content.repository';
+import {
+  IModelInvocationRepository,
+  ModelInvocationRepository,
+} from './repositories/model-invocation.repository';
 
 /**
  * Composition root. Wires the InversifyJS container and exposes a factory for
@@ -168,6 +188,17 @@ export const buildContainer = (): Container => {
       CHRONICLE_TOKENS.TransformationExecutionStore,
     )
     .to(TransformationExecutionStore);
+  container
+    .bind<IExecutionOccurrenceStore>(CHRONICLE_TOKENS.ExecutionOccurrenceStore)
+    .to(ExecutionOccurrenceStore);
+  container
+    .bind<ISourceContentRepository>(CHRONICLE_TOKENS.SourceContentRepository)
+    .to(SourceContentRepository);
+  container
+    .bind<IModelInvocationRepository>(
+      CHRONICLE_TOKENS.ModelInvocationRepository,
+    )
+    .to(ModelInvocationRepository);
 
   // Services
   container
@@ -188,6 +219,9 @@ export const buildContainer = (): Container => {
   container
     .bind<IProvenanceService>(CHRONICLE_TOKENS.ProvenanceService)
     .to(ProvenanceService);
+  container
+    .bind<IInterpretationService>(CHRONICLE_TOKENS.InterpretationService)
+    .to(InterpretationService);
 
   // Handlers
   container
@@ -208,6 +242,9 @@ export const buildContainer = (): Container => {
   container
     .bind<IProvenanceHandler>(CHRONICLE_TOKENS.ProvenanceHandler)
     .to(ProvenanceHandler);
+  container
+    .bind<IInterpretHandler>(CHRONICLE_TOKENS.InterpretHandler)
+    .to(InterpretHandler);
 
   return container;
 };
@@ -251,5 +288,12 @@ export const getTransformationHandler = (): ITransformationHandler => {
 export const getProvenanceHandler = (): IProvenanceHandler => {
   return buildContainer().get<IProvenanceHandler>(
     CHRONICLE_TOKENS.ProvenanceHandler,
+  );
+};
+
+/** Resolve the machine-interpretation handler from a fresh container. */
+export const getInterpretHandler = (): IInterpretHandler => {
+  return buildContainer().get<IInterpretHandler>(
+    CHRONICLE_TOKENS.InterpretHandler,
   );
 };

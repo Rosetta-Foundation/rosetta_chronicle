@@ -13,6 +13,20 @@ describe('TransformationRegistry', () => {
     });
     expect(registry.get('human-note', '9')).toBeNull();
     expect(registry.get('llm-reflection', '1')).toBeNull();
+    expect(registry.get('candidate-observation', '1')).toEqual(
+      expect.objectContaining({
+        type: 'candidate-observation',
+        deterministic: false,
+        allowedProducerTypes: ['agent'],
+        policy: expect.objectContaining({
+          id: 'candidate-observation-policy',
+          version: '1',
+        }),
+      }),
+    );
     expect(registry.list().map((row) => row.type)).toContain('revision');
+    expect(registry.list().map((row) => row.type)).toContain(
+      'candidate-observation',
+    );
   });
 });

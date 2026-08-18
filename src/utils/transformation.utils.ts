@@ -2,6 +2,7 @@ import {
   DerivedProducer,
   DerivedSourceRef,
   DerivedTransformationType,
+  InterpretationPolicy,
   ProvenanceDifference,
   TransformationDefinition,
   TransformationExecution,
@@ -14,6 +15,18 @@ import { CONTENT_HASH } from './derived-record.utils';
 export const TRANSFORMATION_RECIPE_VERSION = '1';
 
 const RECIPE_VERSION = /^[0-9]+$/;
+
+const stablePolicy = (
+  policy: InterpretationPolicy,
+): InterpretationPolicy => ({
+  id: policy.id,
+  version: policy.version,
+  maxObservations: policy.maxObservations,
+  epistemicClasses: [...policy.epistemicClasses],
+  outputSchemaId: policy.outputSchemaId,
+  promptTemplateId: policy.promptTemplateId,
+  promptTemplateHash: policy.promptTemplateHash,
+});
 
 /** Sort object keys so configuration hashing is stable. */
 export const stableObject = (
@@ -40,6 +53,7 @@ export const transformationDefinitionHash = (
       description: recipe.description,
       deterministic: recipe.deterministic,
       allowedProducerTypes: [...recipe.allowedProducerTypes].sort(),
+      ...(recipe.policy ? { policy: stablePolicy(recipe.policy) } : {}),
     }),
   );
 
@@ -58,6 +72,7 @@ export const buildTransformationDefinition = (
     allowedProducerTypes: [...recipe.allowedProducerTypes],
     createdAt,
     contentHash,
+    ...(recipe.policy ? { policy: stablePolicy(recipe.policy) } : {}),
   };
 };
 
