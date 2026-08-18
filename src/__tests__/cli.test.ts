@@ -46,6 +46,7 @@ describe('chronicle CLI', () => {
     expect(result.stdout).toContain('record-derived');
     expect(result.stdout).toContain('transform-record');
     expect(result.stdout).toContain('transformation-provenance');
+    expect(result.stdout).toContain('provenance');
   });
 
   it('inventory-chatgpt exits 1 without --export', () => {
@@ -257,11 +258,47 @@ describe('chronicle CLI', () => {
       expect(provenance.executionId).toBe(parsed.executionId);
       expect(provenance.definitionId).toBe(parsed.definitionId);
       expect(provenance.definition.type).toBe('human-note');
+      const graphs = mkdtempSync(join(tmpdir(), 'cli-graphs-'));
+      const graphWalk = spawnSync(
+        process.execPath,
+        [
+          CLI,
+          'provenance',
+          '--from',
+          `derived-record:${parsed.derivedIds[0]}`,
+          '--direction',
+          'backward',
+          '--graphs',
+          graphs,
+          '--output',
+          out,
+          '--executions',
+          execDir,
+          '--definitions',
+          defDir,
+        ],
+        { encoding: 'utf-8' },
+      );
+      expect(graphWalk.status).toBe(0);
+      const graphResult = JSON.parse(graphWalk.stdout);
+      expect(graphResult.status).toBe('partial');
+      expect(graphResult.failures.map((row: { code: string }) => row.code)).toContain(
+        'source-graph-missing',
+      );
+      rmSync(graphs, { recursive: true, force: true });
     } finally {
       rmSync(out, { recursive: true, force: true });
       rmSync(execDir, { recursive: true, force: true });
       rmSync(defDir, { recursive: true, force: true });
     }
+  });
+
+  it('provenance exits 1 without --from', () => {
+    const result = spawnSync(process.execPath, [CLI, 'provenance'], {
+      encoding: 'utf-8',
+    });
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('--from');
   });
 
   it('transformation-provenance --execution requires --definitions', () => {

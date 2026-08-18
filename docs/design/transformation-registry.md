@@ -154,15 +154,21 @@ The engine writes `<executionsDir>/<id>.json`. The caller supplies
 `--executions` or `CHRONICLE_EXECUTION_DIR`. No personal Chronicle
 layout is encoded.
 
-## 4. Provenance chain
+## 4. Provenance helper
 
 ```text
-Source Archive → Source Graph → Transformation Definition
-        → Transformation Execution → Derived Record
+TransformationDefinition ← cites ─ TransformationExecution ─ cites → SourceGraph
+                                     │
+                                     └─ produces → DerivedRecord
 ```
 
-Backward ("what created this?"): derived `executionId` →
-`definitionId` → `sourceRefs`.
+An execution cites its definition and its source material. The
+definition is not a step between the source graph and the run.
+General graph walks live on `chronicle provenance`
+(`docs/design/provenance-graph.md`).
+
+This helper still answers a single hop: derived `executionId` →
+`definitionId` and `sourceRefs`.
 
 Forward from a definition: executions whose `definitionId` matches,
 then their `outputRefs`.

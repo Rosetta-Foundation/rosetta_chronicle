@@ -68,13 +68,24 @@ Named transformations (PRD-0027) are a fourth handler:
 `TransformationDefinitionStore` + `TransformationExecutionStore` +
 `DerivedRecordStore` (+ optional `ChatGptGraphStore.readAt`). The in-memory
 registry bootstraps recipes; the definition store persists the immutable
-artifact an execution cites. Provenance walks derived → execution →
-definition → source, forward from a definition or source hash, and compare
-two executions. They are not Activity and do not summarize. See
-`docs/design/transformation-registry.md`.
+artifact an execution cites. The compatibility helper
+`transformation-provenance` walks a single execution hop (derived or
+execution → definition and source refs; forward from a definition or
+source hash; compare). It is not the general graph. They are not Activity
+and do not summarize. See `docs/design/transformation-registry.md`.
 
 Definitions explain the recipe. Executions explain the run. Derived records
 explain the interpretation.
+
+Provenance graph traversal (PRD-0027) is a fifth handler:
+`ProvenanceHandler` → `ProvenanceService` → the existing derived, execution,
+definition, and graph stores. It builds an in-memory view and walks it
+backward or forward. An execution cites both its definition and its source
+material; it is not a linear SourceGraph → Definition → Execution chain.
+Direct `record-derived` notes participate without an execution.
+Failures describe the requested subgraph only.
+`transformation-provenance` stays the narrow compatibility helper. See
+`docs/design/provenance-graph.md`.
 
 ### Dependency direction
 
@@ -103,6 +114,7 @@ Defined in `src/types.ts`:
 - **DerivedRecord** — an immutable interpretation *event* citing a source graph (not Activity).
 - **TransformationDefinition** — persisted immutable recipe (type, version, description, flags).
 - **TransformationExecution** — one run of a named recipe; cites `definitionId`.
+- **Provenance graph** — in-memory walk over those artifacts (nodes + cites/produces/contains edges).
 
 These types are the contract between the source repositories, the synthesis service, and downstream
 consumers.

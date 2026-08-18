@@ -657,6 +657,86 @@ export interface ProvenanceResult {
   error?: string;
 }
 
+// ─── Provenance graph traversal (PRD-0027) ───────────────────────────────────
+
+/**
+ * Artifact kinds the provenance graph can name. Closed union for this
+ * phase — extend here when a new durable record type joins the path.
+ */
+export type ProvenanceNodeKind =
+  | 'source-archive'
+  | 'source-conversation'
+  | 'source-node'
+  | 'transformation-definition'
+  | 'transformation-execution'
+  | 'derived-record';
+
+/**
+ * Canonical directed edge types. An execution *cites* a definition and
+ * source material; it *produces* derived records. A source graph
+ * *contains* conversations and nodes. Direct derived records *cite*
+ * source material without an execution.
+ */
+export type ProvenanceEdgeType = 'contains' | 'cites' | 'produces';
+
+export type ProvenanceDirection = 'backward' | 'forward';
+
+export type ProvenanceTraverseStatus =
+  | 'ok'
+  | 'partial'
+  | 'not-found'
+  | 'invalid';
+
+/** Handle for one artifact. Does not copy domain state. */
+export interface ProvenanceRef {
+  kind: ProvenanceNodeKind;
+  id: string;
+}
+
+/** Graph node. `resolved` is false when a cited id could not be loaded. */
+export interface ProvenanceNode extends ProvenanceRef {
+  resolved: boolean;
+}
+
+export interface ProvenanceEdge {
+  type: ProvenanceEdgeType;
+  from: ProvenanceRef;
+  to: ProvenanceRef;
+}
+
+/** One simple walk from the start in the requested direction. */
+export interface ProvenancePath {
+  nodes: ProvenanceRef[];
+}
+
+export interface ProvenanceFailure {
+  code: string;
+  ref: ProvenanceRef;
+  citedBy?: ProvenanceRef;
+}
+
+/** Input to the first-class provenance traversal handler. */
+export interface ProvenanceTraverseInput {
+  start: ProvenanceRef;
+  direction: ProvenanceDirection;
+  graphsDir: string;
+  outputDir: string;
+  executionsDir: string;
+  definitionsDir: string;
+}
+
+/** Structured subgraph plus ordered paths and explicit integrity holes. */
+export interface ProvenanceTraverseResult {
+  status: ProvenanceTraverseStatus;
+  start: ProvenanceRef;
+  direction: ProvenanceDirection;
+  nodes: ProvenanceNode[];
+  edges: ProvenanceEdge[];
+  paths: ProvenancePath[];
+  failures: ProvenanceFailure[];
+  error?: string;
+}
+
 /** Derived inventory of a ChatGPT export. Contains no source message text. */
 export interface ChatGptExportInventory {
   status: ChatGptInventoryStatus;

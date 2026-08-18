@@ -10,6 +10,8 @@ import { ChatGptSourceGraph } from '../types';
  * caller supplies the directory. This store does not know about personal
  * Chronicle layouts, Daily Chronicle sidecars, or export-archive bytes.
  */
+export type GraphResolveStatus = 'ok' | 'missing' | 'invalid';
+
 export interface IChatGptGraphStore {
   /** Read the graph for `contentHash`, or null if absent or unreadable. */
   read(
@@ -25,6 +27,10 @@ export interface IChatGptGraphStore {
   pathFor(outputDir: string, contentHash: string): string;
   /** Read a graph JSON file at an explicit path, or null if unreadable. */
   readAt(filePath: string): Promise<ChatGptSourceGraph | null>;
+  diagnose(
+    outputDir: string,
+    contentHash: string,
+  ): Promise<GraphResolveStatus>;
 }
 
 const CONTENT_HASH = /^[a-f0-9]{64}$/;
@@ -56,6 +62,18 @@ export class ChatGptGraphStore implements IChatGptGraphStore {
     } catch {
       return null;
     }
+  }
+
+  /** @inheritDoc */
+  async diagnose(
+    outputDir: string,
+    contentHash: string,
+  ): Promise<GraphResolveStatus> {
+    if (!CONTENT_HASH.test(contentHash)) return 'invalid';
+    const absPath = this.pathFor(outputDir, contentHash);
+    if (!existsSync(absPath)) return 'missing';
+    const loaded = await this.read(outputDir, contentHash);
+    return loaded ? 'ok' : 'invalid';
   }
 
   /** @inheritDoc */

@@ -1,4 +1,10 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  writeFileSync,
+} from 'fs';
 import path from 'path';
 import { injectable } from 'inversify';
 import { DerivedRecord } from '../types';
@@ -10,13 +16,28 @@ import { DerivedRecord } from '../types';
  * supplies the directory. Does not encode a personal Chronicle layout,
  * emit Activity, or touch Daily Chronicle files.
  */
+export type DerivedResolveStatus = 'ok' | 'missing' | 'invalid';
+
 export interface IDerivedRecordStore {
   read(outputDir: string, id: string): Promise<DerivedRecord | null>;
+  diagnose(outputDir: string, id: string): Promise<DerivedResolveStatus>;
   write(outputDir: string, record: DerivedRecord): Promise<string>;
+  list(outputDir: string): Promise<DerivedRecord[]>;
   pathFor(outputDir: string, id: string): string;
 }
 
 const RECORD_ID = /^[a-f0-9]{64}$/;
+
+const isDerived = (value: unknown): value is DerivedRecord => {
+  if (!value || typeof value !== 'object') return false;
+  const rec = value as Record<string, unknown>;
+  return (
+    typeof rec.id === 'string' &&
+    Array.isArray(rec.sourceRefs) &&
+    typeof rec.contentRef === 'string' &&
+    typeof rec.reviewState === 'string'
+  );
+};
 
 /**
  * Filesystem implementation of {@link IDerivedRecordStore}.
@@ -40,10 +61,36 @@ export class DerivedRecordStore implements IDerivedRecordStore {
     const absPath = this.pathFor(outputDir, id);
     if (!existsSync(absPath)) return null;
     try {
-      return JSON.parse(readFileSync(absPath, 'utf-8')) as DerivedRecord;
+      const parsed: unknown = JSON.parse(readFileSync(absPath, 'utf-8'));
+      return isDerived(parsed) ? parsed : null;
     } catch {
       return null;
     }
+  }
+
+  /** @inheritDoc */
+  async diagnose(
+    outputDir: string,
+    id: string,
+  ): Promise<DerivedResolveStatus> {
+    if (!RECORD_ID.test(id)) return 'invalid';
+    const absPath = this.pathFor(outputDir, id);
+    if (!existsSync(absPath)) return 'missing';
+    const loaded = await this.read(outputDir, id);
+    return loaded ? 'ok' : 'invalid';
+  }
+
+  /** @inheritDoc */
+  async list(outputDir: string): Promise<DerivedRecord[]> {
+    if (!existsSync(outputDir)) return [];
+    const found: DerivedRecord[] = [];
+    for (const name of readdirSync(outputDir)) {
+      if (!name.endsWith('.json')) continue;
+      const id = name.slice(0, -'.json'.length);
+      const record = await this.read(outputDir, id);
+      if (record) found.push(record);
+    }
+    return found;
   }
 
   /** @inheritDoc */

@@ -130,7 +130,9 @@ source graph. The engine does not require the graph file to persist
 the record — the graph may live in another caller-chosen directory.
 
 Provenance is structural. It is not inferred from timestamps or
-directory proximity.
+directory proximity. Graph walks over these cites live on
+`chronicle provenance` (`docs/design/provenance-graph.md`). Direct
+`record-derived` notes participate without an execution.
 
 ## 5. How are transformations versioned?
 

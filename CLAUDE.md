@@ -41,6 +41,7 @@ src/
 ├── chatgpt-import.handler.ts    IChatGptImportHandler (PRD-0027 Phase 2)
 ├── derived-record.handler.ts    IDerivedRecordHandler (PRD-0027 derived records)
 ├── transformation.handler.ts    ITransformationHandler (PRD-0027 executions / definitions)
+├── provenance.handler.ts        IProvenanceHandler (PRD-0027 graph traversal)
 ├── services/
 │   └── chronicle.service.ts     IChronicleService — synthesize sources → DailyChronicle
 ├── repositories/                one per source (interface + stub impl)

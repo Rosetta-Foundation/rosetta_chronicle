@@ -6,6 +6,7 @@ import {
   getChatGptImportHandler,
   getDerivedRecordHandler,
   getTransformationHandler,
+  getProvenanceHandler,
   buildContainer,
 } from '../index';
 import {
@@ -13,9 +14,11 @@ import {
   DerivedProducerType,
   DerivedReviewState,
   DerivedTransformationType,
+  ProvenanceDirection,
   QueueItem,
   QueueState,
 } from '../types';
+import { parseProvenanceFrom } from '../utils/provenance-graph.utils';
 import { readFileSync } from 'fs';
 import { describeDropped, ClobberCheck } from '../utils/clobber.utils';
 import {
@@ -39,6 +42,7 @@ import { CHRONICLE_TOKENS } from '../tokens';
  *   chronicle transform-record    Run a named transformation and persist execution.
  *   chronicle transformation-provenance
  *                                 Walk or compare transformation executions.
+ *   chronicle provenance          First-class backward/forward graph walk.
  *
  * Daily Chronicle commands write to the personal Chronicle repo
  * (CHRONICLE_REPO env var or --repo flag) and are idempotent by content hash.
@@ -58,6 +62,7 @@ Usage:
   chronicle transformation-provenance --definition <id> --definitions <dir> --executions <dir>
   chronicle transformation-provenance --source-graph-hash <hex> --executions <dir>
   chronicle transformation-provenance --compare <id> --with <id> --executions <dir>
+  chronicle provenance --from <kind>:<id> --direction backward|forward --graphs <dir> --output <dir> --executions <dir> --definitions <dir>
   chronicle queue [show] [--repo <path>]
   chronicle queue add "<title>" [--jira KEY] [--prd NNNN/N] [--due DATE] [--repo <path>]
   chronicle queue done "<title-or-id>" [--repo <path>]
@@ -86,8 +91,11 @@ Commands:
                       immutable execution plus derived output. Does not
                       emit Activity or write a Daily Chronicle.
   transformation-provenance
-                      Walk backward from a derived record, forward from
-                      a source hash, or compare two executions.
+                      Narrow compatibility helper: single-hop execution
+                      walks and compare. Not the general graph API.
+  provenance          First-class backward/forward provenance graph walk
+                      over source, definition, execution, and derived
+                      records. Does not emit Activity.
 
 Options:
   --repo <path>       Absolute path to your personal Chronicle repo.
@@ -119,6 +127,12 @@ Options:
                       Falls back to $CHRONICLE_EXECUTION_DIR.
   --definitions <dir> Directory for persisted transformation definitions.
                       Falls back to $CHRONICLE_DEFINITION_DIR.
+  --graphs <dir>      Directory of source-graph JSON files.
+                      Falls back to $CHRONICLE_SOURCE_GRAPH_DIR.
+  --from <kind>:<id>  Start of chronicle provenance (derived-record,
+                      execution, definition, source-archive,
+                      source-conversation, source-node).
+  --direction <dir>   backward | forward (chronicle provenance).
   --source-graph-hash <hex>
                       Archive content hash the derived record cites.
   --source-ref <hex>  Alias for --source-graph-hash.
@@ -157,16 +171,17 @@ Environment variables:
   CHRONICLE_PROJECT   Default value for --project.
   CHRONICLE_CALENDAR  Default value for --calendar (path to .ics export).
   CHRONICLE_SOURCE_GRAPH_DIR
-                      Default --output for import-chatgpt.
+                      Default --output for import-chatgpt and --graphs
+                      for provenance.
   CHRONICLE_DERIVED_DIR
-                      Default --output for record-derived and
-                      transform-record.
+                      Default --output for record-derived,
+                      transform-record, and provenance.
   CHRONICLE_EXECUTION_DIR
-                      Default --executions for transform-record and
-                      transformation-provenance.
+                      Default --executions for transform-record,
+                      transformation-provenance, and provenance.
   CHRONICLE_DEFINITION_DIR
-                      Default --definitions for transform-record and
-                      transformation-provenance.
+                      Default --definitions for transform-record,
+                      transformation-provenance, and provenance.
 `.trim();
 
 interface ParsedArgs {
@@ -211,6 +226,9 @@ interface ParsedArgs {
   executionId?: string;
   compareId?: string;
   withId?: string;
+  graphsDir?: string;
+  fromRef?: string;
+  direction?: string;
 }
 
 function parseArgs(argv: string[]): ParsedArgs {
@@ -308,6 +326,15 @@ function parseArgs(argv: string[]): ParsedArgs {
         break;
       case '--definitions':
         result.definitionsDir = args[++i];
+        break;
+      case '--graphs':
+        result.graphsDir = args[++i];
+        break;
+      case '--from':
+        result.fromRef = args[++i];
+        break;
+      case '--direction':
+        result.direction = args[++i];
         break;
       case '--definition':
         result.definitionId = args[++i];
@@ -894,6 +921,49 @@ async function runTransformationProvenance(args: ParsedArgs): Promise<void> {
   if (result.status !== 'ok') process.exit(1);
 }
 
+async function runProvenance(args: ParsedArgs): Promise<void> {
+  if (!args.fromRef) die('--from <kind>:<id> is required for provenance');
+  if (args.direction !== 'backward' && args.direction !== 'forward') {
+    die('--direction backward|forward is required for provenance');
+  }
+  const parsed = parseProvenanceFrom(args.fromRef);
+  if (!parsed.ref) die(parsed.error ?? 'from-unparseable');
+  const outputDir = args.outputDir ?? process.env['CHRONICLE_DERIVED_DIR'];
+  if (!outputDir)
+    die('--output <dir> (or $CHRONICLE_DERIVED_DIR) is required for provenance');
+  const executionsDir =
+    args.executionsDir ?? process.env['CHRONICLE_EXECUTION_DIR'];
+  if (!executionsDir)
+    die(
+      '--executions <dir> (or $CHRONICLE_EXECUTION_DIR) is required for provenance',
+    );
+  const definitionsDir =
+    args.definitionsDir ?? process.env['CHRONICLE_DEFINITION_DIR'];
+  if (!definitionsDir)
+    die(
+      '--definitions <dir> (or $CHRONICLE_DEFINITION_DIR) is required for provenance',
+    );
+  const graphsDir =
+    args.graphsDir ?? process.env['CHRONICLE_SOURCE_GRAPH_DIR'];
+  if (!graphsDir)
+    die(
+      '--graphs <dir> (or $CHRONICLE_SOURCE_GRAPH_DIR) is required for provenance',
+    );
+  const handler = getProvenanceHandler();
+  const result = await handler.handle({
+    start: parsed.ref,
+    direction: args.direction as ProvenanceDirection,
+    graphsDir,
+    outputDir,
+    executionsDir,
+    definitionsDir,
+  });
+  console.log(JSON.stringify(result, null, 2));
+  if (result.status === 'invalid' || result.status === 'not-found') {
+    process.exit(1);
+  }
+}
+
 async function main(): Promise<void> {
   const args = parseArgs(process.argv);
 
@@ -921,6 +991,9 @@ async function main(): Promise<void> {
       break;
     case 'transformation-provenance':
       await runTransformationProvenance(args);
+      break;
+    case 'provenance':
+      await runProvenance(args);
       break;
     default:
       console.error(`chronicle: unknown command '${args.command}'\n`);
