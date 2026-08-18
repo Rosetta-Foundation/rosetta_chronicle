@@ -23,6 +23,8 @@ export interface IChatGptGraphStore {
   write(outputDir: string, graph: ChatGptSourceGraph): Promise<string>;
   /** Absolute path where the graph for `contentHash` would live. */
   pathFor(outputDir: string, contentHash: string): string;
+  /** Read a graph JSON file at an explicit path, or null if unreadable. */
+  readAt(filePath: string): Promise<ChatGptSourceGraph | null>;
 }
 
 const CONTENT_HASH = /^[a-f0-9]{64}$/;
@@ -66,5 +68,15 @@ export class ChatGptGraphStore implements IChatGptGraphStore {
     mkdirSync(outputDir, { recursive: true });
     writeFileSync(absPath, JSON.stringify(graph, null, 2) + '\n');
     return absPath;
+  }
+
+  /** @inheritDoc */
+  async readAt(filePath: string): Promise<ChatGptSourceGraph | null> {
+    if (!filePath || !existsSync(filePath)) return null;
+    try {
+      return JSON.parse(readFileSync(filePath, 'utf-8')) as ChatGptSourceGraph;
+    } catch {
+      return null;
+    }
   }
 }

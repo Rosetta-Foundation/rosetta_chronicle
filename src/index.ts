@@ -14,6 +14,10 @@ import {
   ChatGptImportHandler,
 } from './chatgpt-import.handler';
 import {
+  IDerivedRecordHandler,
+  DerivedRecordHandler,
+} from './derived-record.handler';
+import {
   IChronicleService,
   ChronicleService,
 } from './services/chronicle.service';
@@ -25,6 +29,10 @@ import {
   IChatGptImportService,
   ChatGptImportService,
 } from './services/chatgpt-import.service';
+import {
+  IDerivedRecordService,
+  DerivedRecordService,
+} from './services/derived-record.service';
 import { IGitRepository, GitRepository } from './repositories/git.repository';
 import {
   IGitDiscoveryRepository,
@@ -68,6 +76,10 @@ import {
   IChatGptGraphStore,
   ChatGptGraphStore,
 } from './repositories/chatgpt-graph-store.repository';
+import {
+  IDerivedRecordStore,
+  DerivedRecordStore,
+} from './repositories/derived-record-store.repository';
 
 /**
  * Composition root. Wires the InversifyJS container and exposes a factory for
@@ -112,6 +124,9 @@ export const buildContainer = (): Container => {
   container
     .bind<IChatGptGraphStore>(CHRONICLE_TOKENS.ChatGptGraphStore)
     .to(ChatGptGraphStore);
+  container
+    .bind<IDerivedRecordStore>(CHRONICLE_TOKENS.DerivedRecordStore)
+    .to(DerivedRecordStore);
 
   // Services
   container
@@ -123,6 +138,9 @@ export const buildContainer = (): Container => {
   container
     .bind<IChatGptImportService>(CHRONICLE_TOKENS.ChatGptImportService)
     .to(ChatGptImportService);
+  container
+    .bind<IDerivedRecordService>(CHRONICLE_TOKENS.DerivedRecordService)
+    .to(DerivedRecordService);
 
   // Handlers
   container
@@ -134,6 +152,9 @@ export const buildContainer = (): Container => {
   container
     .bind<IChatGptImportHandler>(CHRONICLE_TOKENS.ChatGptImportHandler)
     .to(ChatGptImportHandler);
+  container
+    .bind<IDerivedRecordHandler>(CHRONICLE_TOKENS.DerivedRecordHandler)
+    .to(DerivedRecordHandler);
 
   return container;
 };
@@ -156,5 +177,12 @@ export const getChatGptInventoryHandler = (): IChatGptInventoryHandler => {
 export const getChatGptImportHandler = (): IChatGptImportHandler => {
   return buildContainer().get<IChatGptImportHandler>(
     CHRONICLE_TOKENS.ChatGptImportHandler,
+  );
+};
+
+/** Resolve the derived-record handler from a fresh container. */
+export const getDerivedRecordHandler = (): IDerivedRecordHandler => {
+  return buildContainer().get<IDerivedRecordHandler>(
+    CHRONICLE_TOKENS.DerivedRecordHandler,
   );
 };

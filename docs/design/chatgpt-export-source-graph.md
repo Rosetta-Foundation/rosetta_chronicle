@@ -44,9 +44,11 @@ So Phase 2 stores a **source record**:
 ```text
 immutable source archive   (bytes stay outside this repo for now)
         ↓
-normalized conversation graph   (this PR)
+normalized conversation graph   (Phase 2)
         ↓
-later: personal-domain Activity / reflection
+derived record                  (inspectable transformation)
+        ↓
+later: Chronicle representation / reflection
         ↓
 never automatic: organizational Chronicle
 ```

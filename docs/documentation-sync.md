@@ -113,15 +113,16 @@ Implemented:
 - missing attachment representation
 - synthetic fixtures
 - archive hashing
-- source-graph persistence into a personal Chronicle (topology and type only; not Activity)
+- source-graph persistence (topology and type only; not Activity)
+- provenance-preserving derived records (human-authored; not Activity)
 
 Not implemented:
 
 - ChatGPT import into Activity
 - Daily Chronicle synthesis from ChatGPT
 - organizational promotion
-- transformation lineage
-- reflection extraction
+- automatic summarization or reflection extraction
+- AI-generated transformations with model/prompt identity
 - raw attachment persistence
 - generalized personal activity modeling
 

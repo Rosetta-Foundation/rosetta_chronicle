@@ -432,6 +432,104 @@ export interface ChatGptImportResult {
   error?: string;
 }
 
+// ─── Derived records (PRD-0027 transformation layer) ─────────────────────────
+
+/**
+ * Kind of transformation. This phase persists the record; it does not
+ * auto-generate summaries or reflections.
+ */
+export type DerivedTransformationType =
+  | 'human-note'
+  | 'reflection'
+  | 'summary'
+  | 'insight'
+  | 'decision'
+  | 'activity-candidate'
+  | 'revision';
+
+/** Evaluation seed on a derived record. Full evaluation history is later. */
+export type DerivedReviewState =
+  | 'unreviewed'
+  | 'recognized'
+  | 'rejected'
+  | 'corrected'
+  | 'uncertain';
+
+export type DerivedProducerType = 'human' | 'agent';
+
+/** Who produced the transformation. Agent records require a model. */
+export interface DerivedProducer {
+  type: DerivedProducerType;
+  name: string;
+  model?: string;
+  promptVersion?: string;
+}
+
+/**
+ * Why this derived record exists. Points at source-graph structure, not
+ * at Activity.
+ */
+export interface DerivedSourceRef {
+  sourceGraphHash: string;
+  conversationId?: string;
+  nodeIds: string[];
+}
+
+/**
+ * Inspectable transformation from a source graph. Not Activity, not a
+ * graph backup. `id` is an immutable transformation *event* (this
+ * producer, this content, these refs, this type/version) — not a
+ * persistent conceptual artifact that can be edited in place. Content
+ * is optional so a private store can hold the body while `contentRef`
+ * remains the durable handle.
+ */
+export interface DerivedRecord {
+  /** Immutable event id; not a living conceptual identity. */
+  id: string;
+  sourceRefs: DerivedSourceRef[];
+  transformationType: DerivedTransformationType;
+  transformationVersion: string;
+  createdAt: string;
+  createdBy: DerivedProducer;
+  contentRef: string;
+  content?: string;
+  confidence?: number;
+  reviewState: DerivedReviewState;
+}
+
+/** Input to the derived-record handler. */
+export interface DerivedRecordInput {
+  outputDir: string;
+  sourceGraphHash: string;
+  conversationId?: string;
+  nodeIds: string[];
+  transformationType: DerivedTransformationType;
+  createdBy: DerivedProducer;
+  content: string;
+  createdAt?: string;
+  confidence?: number;
+  reviewState?: DerivedReviewState;
+  /** Optional source-graph JSON to validate refs against. */
+  graphPath?: string;
+  dryRun?: boolean;
+}
+
+export type DerivedRecordStatus =
+  | 'recorded'
+  | 'already-present'
+  | 'invalid';
+
+/** Result of recording a derived transformation. */
+export interface DerivedRecordResult {
+  status: DerivedRecordStatus;
+  id?: string;
+  path?: string;
+  contentRef?: string;
+  createdAt?: string;
+  reviewState?: DerivedReviewState;
+  error?: string;
+}
+
 /** Derived inventory of a ChatGPT export. Contains no source message text. */
 export interface ChatGptExportInventory {
   status: ChatGptInventoryStatus;

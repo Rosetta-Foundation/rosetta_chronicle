@@ -64,6 +64,8 @@ describe('ChatGptGraphStore', () => {
     expect(readFileSync(expected, 'utf-8')).not.toContain(
       'REDACTED_SHOULD_NOT_LEAK',
     );
+    expect((await store.readAt(expected))?.archive.contentHash).toBe(HASH);
+    expect(await store.readAt(path.join(repoDir, 'missing.json'))).toBeNull();
   });
 
   it('rejects a non-hex content hash so the path cannot escape', async () => {

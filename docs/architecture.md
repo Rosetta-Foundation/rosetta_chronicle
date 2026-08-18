@@ -56,6 +56,13 @@ The record is source structure, not an archive backup and not `Activity`; it doe
 enter Daily Chronicle synthesis. `chatgpt-export` stays off `ActivitySource`. See
 `docs/design/chatgpt-export-source-graph.md`.
 
+Derived records (PRD-0027 next phase) are a third handler:
+`DerivedRecordHandler` → `DerivedRecordService` → `DerivedRecordStore` (+ optional
+`ChatGptGraphStore.readAt` for ref checks). They persist an inspectable
+transformation with source-graph provenance. Content is human-created in this
+phase. They are not Activity, not automatic summaries, and not promotion. See
+`docs/design/derived-records.md`.
+
 ### Dependency direction
 
 ```
