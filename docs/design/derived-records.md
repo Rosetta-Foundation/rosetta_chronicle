@@ -174,9 +174,10 @@ Human-authored content defaults to `recognized`. Agent-authored
 content defaults to `unreviewed` and requires a model identity.
 `interpret-source` always writes `unreviewed` and does not accept
 `--review-state`. E4b measured that those machine records stayed
-`unreviewed` after a later human inspection. That inspection is not
-yet a creation fact on that record. Human evaluation is a new
-artifact; see `docs/design/evaluation.md`. See
+`unreviewed` after a later human inspection. E5 recorded that
+inspection as three append-only evaluation artifacts; the machine
+records remained byte-identical and `unreviewed`. See
+`docs/design/evaluation.md` (E5 checkpoint) and
 `docs/design/interpretation-policy.md` (E4b checkpoint).
 
 ## 7. How does privacy boundary enforcement work?

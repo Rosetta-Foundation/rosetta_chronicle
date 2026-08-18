@@ -351,8 +351,9 @@ because it produced no epistemic artifact. Attempt history is why
 - Background interpretation
 
 Two physical invokes, one of them committed, are not a claim about
-model reliability. The human review act itself is **not** yet a
-Chronicle artifact.
+model reliability. The human review act itself was **not** a
+Chronicle artifact in E4b. E5 later recorded those three acts; see
+`docs/design/evaluation.md`.
 
 ## Architecture
 

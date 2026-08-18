@@ -44,6 +44,11 @@ second of two physical specimen invocations): backward `ok` from
 each derived record and forward `ok` from each selected source node,
 with no direct `source → derived` machine lineage. See
 `docs/design/interpretation-policy.md`.
+E5 measured the evaluation extension of that walk: backward `ok`
+from each evaluation through interpretation, execution, and
+definition / source, and forward `ok` from each selected source node
+through execution, interpretations, and evaluations. See
+`docs/design/evaluation.md`.
 
 Occurrences (`ExecutionOccurrence`) are operational receipts of a
 provider invoke. They are **not** provenance-graph nodes and are not

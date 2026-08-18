@@ -130,6 +130,12 @@ Implemented:
   and observations are not in this repository)
 - append-only human evaluation of a derived record
   (`evaluate-derived`; not current understanding, not Activity)
+- E5 measured locally (three append-only human evaluations of the
+  three E4b machine interpretations: `evidenceSupport = supported`
+  × 3, `personalRecognition` omitted; machine records remained
+  byte-identical and `unreviewed`; no provider invoke; sanitized
+  result in `docs/design/evaluation.md`; private source,
+  observations, and evaluation prose are not in this repository)
 
 Not implemented:
 
