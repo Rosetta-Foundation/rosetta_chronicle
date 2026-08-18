@@ -115,7 +115,7 @@ describe('ModelInvocationRepository', () => {
       input: string;
       reasoning_effort: string;
       store: boolean;
-      search_parameters: { mode: string };
+      search_parameters?: { mode: string };
       temperature: number;
       tools?: unknown;
     };
@@ -123,7 +123,7 @@ describe('ModelInvocationRepository', () => {
     expect(body.input).toBe('SYNTHETIC_PROMPT');
     expect(body.reasoning_effort).toBe('high');
     expect(body.store).toBe(false);
-    expect(body.search_parameters).toEqual({ mode: 'off' });
+    expect(body.search_parameters).toBeUndefined();
     expect(body.temperature).toBe(0);
     expect(body.tools).toBeUndefined();
   });

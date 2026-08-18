@@ -33,8 +33,9 @@ interface ResponsesBody {
  *
  * Completion order: fixture file, then one xAI Responses HTTP call
  * when `--provider` is xAI and `XAI_API_KEY` is set. No vendor SDK.
- * Search and tool use are off. `store` is false so the request is
- * not kept as a retrievable xAI response.
+ * No tools and no `search_parameters` (that field is deprecated and
+ * 410s). `store` is false so the request is not kept as a retrievable
+ * xAI response.
  */
 export interface IModelInvocationRepository {
   invoke(request: ModelInvokeRequest): Promise<ModelInvokeResult>;
@@ -84,7 +85,6 @@ export class ModelInvocationRepository implements IModelInvocationRepository {
           input: request.prompt,
           reasoning_effort: REASONING_EFFORT,
           store: false,
-          search_parameters: { mode: 'off' },
           ...(request.temperature != null
             ? { temperature: request.temperature }
             : {}),
