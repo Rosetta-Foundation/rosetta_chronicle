@@ -17,11 +17,21 @@ import { validateTransformationDefinition } from '../utils/transformation.utils'
  * caller supplies the directory. Does not encode a personal Chronicle
  * layout, emit Activity, or touch Daily Chronicle files.
  */
+export type DefinitionResolveStatus = 'ok' | 'missing' | 'invalid';
+
 export interface ITransformationDefinitionStore {
   read(
     definitionsDir: string,
     id: string,
   ): Promise<TransformationDefinition | null>;
+  /**
+   * Why `read` would fail. Distinguishes a missing file from a
+   * present-but-unreadable artifact (malformed or hash-invalid).
+   */
+  diagnose(
+    definitionsDir: string,
+    id: string,
+  ): Promise<DefinitionResolveStatus>;
   write(
     definitionsDir: string,
     definition: TransformationDefinition,
@@ -79,6 +89,18 @@ export class TransformationDefinitionStore
     } catch {
       return null;
     }
+  }
+
+  /** @inheritDoc */
+  async diagnose(
+    definitionsDir: string,
+    id: string,
+  ): Promise<DefinitionResolveStatus> {
+    if (!RECORD_ID.test(id)) return 'invalid';
+    const absPath = this.pathFor(definitionsDir, id);
+    if (!existsSync(absPath)) return 'missing';
+    const loaded = await this.read(definitionsDir, id);
+    return loaded ? 'ok' : 'invalid';
   }
 
   /** @inheritDoc */

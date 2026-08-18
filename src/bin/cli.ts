@@ -868,11 +868,20 @@ async function runTransformationProvenance(args: ParsedArgs): Promise<void> {
     die(
       '--executions <dir> (or $CHRONICLE_EXECUTION_DIR) is required for transformation-provenance',
     );
+  const definitionsDir =
+    args.definitionsDir ?? process.env['CHRONICLE_DEFINITION_DIR'];
+  const needsDefinitions = Boolean(
+    args.derivedId || args.executionId || args.definitionId,
+  );
+  if (needsDefinitions && !definitionsDir) {
+    die(
+      '--definitions <dir> (or $CHRONICLE_DEFINITION_DIR) is required when walking from --derived, --execution, or --definition',
+    );
+  }
   const handler = getTransformationHandler();
   const result = await handler.provenance({
     executionsDir,
-    definitionsDir:
-      args.definitionsDir ?? process.env['CHRONICLE_DEFINITION_DIR'],
+    definitionsDir,
     outputDir: args.outputDir ?? process.env['CHRONICLE_DERIVED_DIR'],
     derivedId: args.derivedId,
     executionId: args.executionId,

@@ -264,6 +264,26 @@ describe('chronicle CLI', () => {
     }
   });
 
+  it('transformation-provenance --execution requires --definitions', () => {
+    const result = spawnSync(
+      process.execPath,
+      [
+        CLI,
+        'transformation-provenance',
+        '--execution',
+        'a'.repeat(64),
+        '--executions',
+        mkdtempSync(join(tmpdir(), 'cli-exec-req-')),
+      ],
+      {
+        encoding: 'utf-8',
+        env: { ...process.env, CHRONICLE_DEFINITION_DIR: undefined },
+      },
+    );
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('--definitions');
+  });
+
   it('exits 1 with unknown command', () => {
     const result = spawnSync(process.execPath, [CLI, 'foobar'], {
       encoding: 'utf-8',

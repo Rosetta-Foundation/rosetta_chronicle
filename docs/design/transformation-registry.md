@@ -170,6 +170,15 @@ then their `outputRefs`.
 Forward from a source: executions whose `sourceRefs` cite the archive
 hash, then their `outputRefs`.
 
+If an execution cites a `definitionId`, that artifact is required
+provenance. Walking from `--derived` or `--execution` without
+`--definitions` (or `$CHRONICLE_DEFINITION_DIR`) is
+`definitions-dir-required`. A missing file is `definition-missing`; a
+present but malformed or hash-invalid file is `definition-invalid`.
+Those are not `ok`. The result still includes the execution and
+`definitionId` so the hole is visible. Source-hash and compare walks
+do not resolve definitions.
+
 Compare ("what would be different?"): field-level difference between
 two executions (type, recipe version, refs, producer, configuration,
 output content hashes). `createdAt` is not a difference that matters

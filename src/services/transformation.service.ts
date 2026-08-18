@@ -291,21 +291,33 @@ export class TransformationService implements ITransformationService {
     query: ProvenanceQuery,
   ): Promise<ProvenanceResult> {
     const definitionId = query.definitionId as string;
-    let definition: TransformationDefinition | undefined;
-    if (query.definitionsDir) {
-      const loaded = await this._definitionStore.read(
-        query.definitionsDir,
+    if (!query.definitionsDir) {
+      return {
+        status: 'invalid',
         definitionId,
-      );
-      definition = loaded ?? undefined;
+        error: 'definitions-dir-required',
+      };
     }
     const listed = await this._executionStore.list(query.executionsDir);
     const matched = listed.filter((row) => row.definitionId === definitionId);
-    if (!definition && matched.length === 0) {
+    const definition = await this._definitionStore.read(
+      query.definitionsDir,
+      definitionId,
+    );
+    if (!definition) {
+      const diagnosis = await this._definitionStore.diagnose(
+        query.definitionsDir,
+        definitionId,
+      );
       return {
         status: 'not-found',
         definitionId,
-        error: 'definition-missing',
+        error:
+          diagnosis === 'missing'
+            ? 'definition-missing'
+            : 'definition-invalid',
+        executionIds: matched.map((row) => row.id),
+        derivedIds: matched.flatMap((row) => row.outputRefs),
       };
     }
     return {
@@ -357,16 +369,46 @@ export class TransformationService implements ITransformationService {
     return draft;
   }
 
+  /**
+   * Resolve the cited definition or fail honestly. A `definitionId` on
+   * an execution is required provenance — omitting the store, or
+   * failing to read the artifact, is not equivalent to success.
+   */
   private async withDefinition(
     query: ProvenanceQuery,
     result: ProvenanceResult,
   ): Promise<ProvenanceResult> {
-    if (!query.definitionsDir || !result.definitionId) return result;
+    if (!result.definitionId) {
+      return {
+        ...result,
+        status: 'invalid',
+        error: 'definition-id-missing',
+      };
+    }
+    if (!query.definitionsDir) {
+      return {
+        ...result,
+        status: 'invalid',
+        error: 'definitions-dir-required',
+      };
+    }
     const definition = await this._definitionStore.read(
       query.definitionsDir,
       result.definitionId,
     );
-    return definition ? { ...result, definition } : result;
+    if (definition) return { ...result, definition };
+    const diagnosis = await this._definitionStore.diagnose(
+      query.definitionsDir,
+      result.definitionId,
+    );
+    return {
+      ...result,
+      status: 'not-found',
+      error:
+        diagnosis === 'missing'
+          ? 'definition-missing'
+          : 'definition-invalid',
+    };
   }
 
   private sourceRef(input: TransformRecordInput): DerivedSourceRef {

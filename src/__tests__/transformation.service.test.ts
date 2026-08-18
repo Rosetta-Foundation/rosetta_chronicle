@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 import { Container } from 'inversify';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { TransformRecordInput } from '../types';
@@ -218,6 +218,72 @@ describe('TransformationService', () => {
     expect(
       (compared.difference as { field: string }[]).map((row) => row.field),
     ).toEqual(['configuration', 'outputContentRefs']);
+  });
+
+  it('fails honestly when a cited definition is missing or invalid', async () => {
+    const recorded = await service.transform(
+      baseInput(outputDir, executionsDir, definitionsDir),
+    );
+    const defPath = recorded.definitionPath as string;
+    const derivedId = (recorded.derivedIds as string[])[0];
+
+    rmSync(defPath);
+    const missingExec = await service.provenance({
+      executionsDir,
+      definitionsDir,
+      executionId: recorded.executionId,
+    });
+    expect(missingExec.status).toBe('not-found');
+    expect(missingExec.error).toBe('definition-missing');
+    expect(missingExec.executionId).toBe(recorded.executionId);
+    expect(missingExec.definitionId).toBe(recorded.definitionId);
+    expect(existsSync(join(outputDir, 'chronicles'))).toBe(false);
+
+    const missingDerived = await service.provenance({
+      executionsDir,
+      definitionsDir,
+      outputDir,
+      derivedId,
+    });
+    expect(missingDerived.status).toBe('not-found');
+    expect(missingDerived.error).toBe('definition-missing');
+
+    const fromDef = await service.provenance({
+      executionsDir,
+      definitionsDir,
+      definitionId: recorded.definitionId,
+    });
+    expect(fromDef.status).toBe('not-found');
+    expect(fromDef.error).toBe('definition-missing');
+    expect(fromDef.executionIds).toEqual([recorded.executionId]);
+
+    writeFileSync(
+      defPath,
+      JSON.stringify({
+        id: recorded.definitionId,
+        type: 'human-note',
+        version: '1',
+        description: 'tampered recipe text',
+        deterministic: true,
+        allowedProducerTypes: ['human', 'agent'],
+        createdAt: CREATED,
+        contentHash: recorded.definitionId,
+      }),
+    );
+    const invalid = await service.provenance({
+      executionsDir,
+      definitionsDir,
+      executionId: recorded.executionId,
+    });
+    expect(invalid.status).toBe('not-found');
+    expect(invalid.error).toBe('definition-invalid');
+
+    const noDir = await service.provenance({
+      executionsDir,
+      executionId: recorded.executionId,
+    });
+    expect(noDir.status).toBe('invalid');
+    expect(noDir.error).toBe('definitions-dir-required');
   });
 
   it('rejects an unknown recipe version and does not write Activity', async () => {

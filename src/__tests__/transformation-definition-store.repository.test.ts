@@ -46,5 +46,7 @@ describe('TransformationDefinitionStore', () => {
     );
     expect(await store.read(dir, record.id)).toBeNull();
     expect(await store.list(dir)).toEqual([]);
+    expect(await store.diagnose(dir, record.id)).toBe('invalid');
+    expect(await store.diagnose(dir, 'e'.repeat(64))).toBe('missing');
   });
 });
