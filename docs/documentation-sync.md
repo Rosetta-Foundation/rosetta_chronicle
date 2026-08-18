@@ -121,6 +121,8 @@ Implemented:
 - first-class provenance graph traversal (backward and forward; partial integrity)
 - machine interpretation of explicitly cited ChatGPT nodes
   (`candidate-observation` / `interpret-source`; not Activity)
+- live Anthropic Messages HTTP transport for interpret-source
+  (`ANTHROPIC_API_KEY`; no vendor SDK)
 
 Not implemented:
 
@@ -130,7 +132,7 @@ Not implemented:
 - automatic summarization or reflection extraction
 - raw attachment persistence
 - generalized personal activity modeling
-- live vendor model SDK in this engine
+- a second live provider or a vendored model SDK
 - bulk conversation scan / E4b private Specimen A
 
 ---
