@@ -255,8 +255,88 @@ expanded prompt, or log credentials or source. A second provider,
 Cursor agent transport, and a vendored SDK are out of scope.
 
 Public tests use the synthetic ChatGPT export fixture and a mocked
-HTTP transport. E4b private Specimen A smoke is a separate local
-experiment, not this repository.
+HTTP transport. E4b private smoke is a local experiment; its source
+and observation text are not in this repository.
+
+## E4b — measured local experiment (2026-08-18)
+
+E4b asked whether one bounded real-model invocation can interpret a
+deliberately selected slice of private source and leave a provenance
+path that distinguishes source, policy, execution, physical
+invocation, and epistemic restraint.
+
+It is an experiment, not a product feature and not a reliability
+claim.
+
+### Sanitized result
+
+| Field | Measured |
+| --- | --- |
+| Engine revision | `27a3008` (#18 merge on #17) |
+| Provider / requested model | xAI / `grok-4.6` |
+| Selected nodes | 4 |
+| Roles | 2 user / 2 assistant |
+| Content types | `text` 3, `multimodal_text` 1 |
+| Attachments | 1 present image, 0 missing |
+| Observations | 3 |
+| Epistemic classes | `directly-supported` 3 |
+| `providerStatus` | `succeeded` |
+| `outcome` | `observations` |
+| `persistenceStatus` | `committed` |
+| `providerRequestId` captured | yes |
+| Provider `modelVersion` captured | yes, `grok-4.6` |
+| Backward provenance | `ok` × 3 |
+| Forward provenance | `ok` × 4 |
+| Structural failures | none |
+| Privacy tripwire | pass |
+| Activity / Daily Chronicle / promotion | none |
+| Human review | all supported as classified |
+
+Additional sanitized behavioral finding: all three observations were
+supported by cited source text. The present image attachment was not
+described or invented. The multimodal node was not cited.
+`supportNote` behaved as machine commentary rather than source. All
+machine observations remained `unreviewed` in Chronicle.
+
+A prior live attempt against the same selection failed as
+`unavailable` after xAI returned HTTP 410 for deprecated
+`search_parameters`. That receipt stayed `not-committed`. #18 omitted
+the field. The measured success above is the single subsequent invoke.
+There was no retry of a schema-valid result.
+
+### Proven
+
+- Bounded real machine interpretation can be produced
+- Machine interpretation remains distinct from source
+- Exact source lineage survives
+- Transformation policy survives
+- Provider/model invocation identity survives
+- Physical invocation receipt survives
+- Machine observations begin `unreviewed`
+- Forward and backward provenance survive
+- Private source does not enter the public engine artifacts tested
+- No Activity / Daily Chronicle / promotion occurs
+- In this experiment, human review found all three classifications
+  supported
+
+### Not proven
+
+- General model reliability
+- Reliability across the corpus
+- Reliable multimodal interpretation
+- Behavior with missing attachments
+- Biography
+- Automatic memory creation
+- Current understanding
+- Conflict resolution
+- Review / evaluation semantics
+- Promotion
+- Organizational use
+- Wayfinder
+- Background interpretation
+
+One successful invoke is not a claim about model reliability. The
+human review act itself is **not** yet a Chronicle artifact.
 
 ## Architecture
 
@@ -305,5 +385,6 @@ promote, does not accept `--review-state` or `--content`.
 - Review CLI
 - Attachment-lineage walk
 - Vendor SDK / Cursor agent transport / a second live provider
-- E4b private Specimen A
+- Human evaluation as a durable Chronicle event (E5)
+- Private E4b source or observation text in this repository
 - Redesigning provenance `partial`

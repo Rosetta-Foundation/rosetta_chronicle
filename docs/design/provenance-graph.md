@@ -39,7 +39,10 @@ Those two shapes must not be collapsed. The walker still lists every
 durable derived file, so a machine `DerivedRecord` published without
 its execution would look like a direct human note on a forward walk.
 E4a therefore publishes the execution **before** the derived record.
-See `docs/design/interpretation-policy.md`.
+E4b measured that shape on one live xAI invoke: backward `ok` from
+each derived record and forward `ok` from each selected source node,
+with no direct `source → derived` machine lineage. See
+`docs/design/interpretation-policy.md`.
 
 Occurrences (`ExecutionOccurrence`) are operational receipts of a
 provider invoke. They are **not** provenance-graph nodes and are not
