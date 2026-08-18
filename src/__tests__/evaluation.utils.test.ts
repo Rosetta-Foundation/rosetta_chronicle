@@ -1,6 +1,8 @@
 import {
+  asDerivedEvaluation,
   buildDerivedEvaluation,
   evaluationId,
+  evaluationIntegrityOk,
   validateEvaluationDraft,
 } from '../utils/evaluation.utils';
 
@@ -92,5 +94,22 @@ describe('evaluation.utils', () => {
     });
     expect(first.id).toBe(second.id);
     expect(first.recordedAt).not.toBe(second.recordedAt);
+  });
+
+  it('rejects a stored identity that no longer hashes to its id', () => {
+    const record = buildDerivedEvaluation({
+      evaluatedRecordId: HASH,
+      evaluator: { type: 'human', name: 'operator' },
+      evaluatedAt: WHEN,
+      recordedAt: WHEN,
+      evidenceSupport: 'supported',
+    });
+    expect(evaluationIntegrityOk(record)).toBe(true);
+    expect(
+      evaluationIntegrityOk({ ...record, evidenceSupport: 'uncertain' }),
+    ).toBe(false);
+    expect(
+      asDerivedEvaluation({ ...record, evidenceSupport: 'uncertain' }),
+    ).toBeNull();
   });
 });

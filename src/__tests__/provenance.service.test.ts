@@ -566,4 +566,72 @@ describe('ProvenanceService', () => {
       ]),
     );
   });
+
+  it('cites a preceding evaluation in both walk directions', async () => {
+    const recorded = await transform.transform(
+      transformInput(outputDir, executionsDir, definitionsDir),
+    );
+    const derivedId = (recorded.derivedIds as string[])[0];
+    const first = await evaluate.evaluate({
+      outputDir,
+      evaluationsDir,
+      evaluatedRecordId: derivedId,
+      evaluatorName: 'operator',
+      evidenceSupport: 'supported',
+      evaluatedAt: CREATED,
+    });
+    const second = await evaluate.evaluate({
+      outputDir,
+      evaluationsDir,
+      evaluatedRecordId: derivedId,
+      evaluatorName: 'operator',
+      evidenceSupport: 'uncertain',
+      precedingEvaluationId: first.id,
+      evaluatedAt: '2026-08-18T23:00:00.000Z',
+    });
+    expect(second.status).toBe('recorded');
+
+    const backward = await provenance.traverse({
+      ...dirs(),
+      evaluationsDir,
+      start: { kind: 'evaluation', id: second.id as string },
+      direction: 'backward',
+    });
+    expect(backward.status).toBe('ok');
+    expect(backward.edges).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'cites',
+          from: { kind: 'evaluation', id: second.id },
+          to: { kind: 'evaluation', id: first.id },
+        }),
+      ]),
+    );
+    expect((backward.nodes as { id: string }[]).map((n) => n.id)).toContain(
+      first.id,
+    );
+
+    const forward = await provenance.traverse({
+      ...dirs(),
+      evaluationsDir,
+      start: { kind: 'evaluation', id: first.id as string },
+      direction: 'forward',
+    });
+    expect(forward.status).toBe('ok');
+    expect((forward.nodes as { id: string }[]).map((n) => n.id)).toContain(
+      second.id,
+    );
+
+    rmSync(join(evaluationsDir, `${first.id}.json`));
+    const hole = await provenance.traverse({
+      ...dirs(),
+      evaluationsDir,
+      start: { kind: 'evaluation', id: second.id as string },
+      direction: 'backward',
+    });
+    expect(hole.status).toBe('partial');
+    expect(
+      (hole.failures as { code: string }[]).map((row) => row.code),
+    ).toContain('preceding-evaluation-missing');
+  });
 });

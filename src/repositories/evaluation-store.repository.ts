@@ -8,13 +8,16 @@ import {
 import path from 'path';
 import { injectable } from 'inversify';
 import { DerivedEvaluation } from '../types';
+import { asDerivedEvaluation } from '../utils/evaluation.utils';
 
 /**
  * Persistence adapter for append-only human evaluations.
  *
- * Resource access only. Writes `<evaluationsDir>/<id>.json` — the
- * caller supplies the directory. Does not encode a personal Chronicle
- * layout, emit Activity, or mutate derived records.
+ * Resource access only. Writes `<evaluationsDir>/<id>.json`. Does not
+ * encode a personal Chronicle layout, emit Activity, or mutate derived
+ * records. `write` is append-only: a present file is never rewritten.
+ * Identical content is already-present; different content is an
+ * integrity error. A malformed file is corruption, not a rewrite permit.
  */
 export type EvaluationResolveStatus = 'ok' | 'missing' | 'invalid';
 
@@ -31,25 +34,27 @@ export interface IEvaluationStore {
 
 const RECORD_ID = /^[a-f0-9]{64}$/;
 
-const isEvaluation = (value: unknown): value is DerivedEvaluation => {
-  if (!value || typeof value !== 'object') return false;
-  const rec = value as Record<string, unknown>;
-  return (
-    rec.schemaVersion === 'derived-evaluation/1' &&
-    typeof rec.id === 'string' &&
-    typeof rec.evaluatedRecordId === 'string' &&
-    typeof rec.evaluatedAt === 'string' &&
-    typeof rec.recordedAt === 'string' &&
-    rec.evaluator != null &&
-    typeof rec.evaluator === 'object'
-  );
-};
+/**
+ * Stable JSON for integrity compare. `recordedAt` is not in the id but
+ * still must not be rewritten once the artifact exists.
+ */
+const canonicalize = (value: unknown): string =>
+  JSON.stringify(value, (_key, item: unknown) => {
+    if (item && typeof item === 'object' && !Array.isArray(item)) {
+      const sorted: Record<string, unknown> = {};
+      for (const key of Object.keys(item as object).sort()) {
+        sorted[key] = (item as Record<string, unknown>)[key];
+      }
+      return sorted;
+    }
+    return item;
+  });
 
 /**
  * Filesystem implementation of {@link IEvaluationStore}.
  *
- * One JSON file per evaluation id. A malformed file reads back as null
- * so a re-record can rewrite it.
+ * One JSON file per evaluation id. Content-addressed: read/diagnose
+ * recompute identity from stored fields. Append-only at this boundary.
  */
 @injectable()
 export class EvaluationStore implements IEvaluationStore {
@@ -68,7 +73,9 @@ export class EvaluationStore implements IEvaluationStore {
     if (!existsSync(absPath)) return null;
     try {
       const parsed: unknown = JSON.parse(readFileSync(absPath, 'utf-8'));
-      return isEvaluation(parsed) ? parsed : null;
+      const evaluation = asDerivedEvaluation(parsed);
+      if (!evaluation || evaluation.id !== id) return null;
+      return evaluation;
     } catch {
       return null;
     }
@@ -107,7 +114,26 @@ export class EvaluationStore implements IEvaluationStore {
     if (!RECORD_ID.test(evaluation.id)) {
       throw new Error(`invalid evaluation id: ${evaluation.id}`);
     }
+    if (!asDerivedEvaluation(evaluation)) {
+      throw new Error(`evaluation-conflict:identity:${evaluation.id}`);
+    }
     const absPath = this.pathFor(evaluationsDir, evaluation.id);
+    if (existsSync(absPath)) {
+      let existing: unknown;
+      try {
+        existing = JSON.parse(readFileSync(absPath, 'utf-8'));
+      } catch {
+        throw new Error(`evaluation-conflict:unreadable:${evaluation.id}`);
+      }
+      const parsed = asDerivedEvaluation(existing);
+      if (!parsed || parsed.id !== evaluation.id) {
+        throw new Error(`evaluation-conflict:invalid:${evaluation.id}`);
+      }
+      if (canonicalize(parsed) !== canonicalize(evaluation)) {
+        throw new Error(`evaluation-conflict:immutable:${evaluation.id}`);
+      }
+      return absPath;
+    }
     mkdirSync(evaluationsDir, { recursive: true });
     writeFileSync(absPath, JSON.stringify(evaluation, null, 2) + '\n');
     return absPath;

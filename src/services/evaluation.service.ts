@@ -125,10 +125,22 @@ export class EvaluationService implements IEvaluationService {
     if (existing && existing.id === evaluation.id) {
       return this.toResult('already-present', existing, input.evaluationsDir);
     }
+    const diagnosis = await this._evaluationStore.diagnose(
+      input.evaluationsDir,
+      evaluation.id,
+    );
+    if (diagnosis === 'invalid') {
+      return this.invalid(`evaluation-conflict:invalid:${evaluation.id}`);
+    }
     if (input.dryRun) {
       return this.toResult('dry-run', evaluation, input.evaluationsDir);
     }
-    await this._evaluationStore.write(input.evaluationsDir, evaluation);
+    try {
+      await this._evaluationStore.write(input.evaluationsDir, evaluation);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return this.invalid(message);
+    }
     return this.toResult('recorded', evaluation, input.evaluationsDir);
   }
 

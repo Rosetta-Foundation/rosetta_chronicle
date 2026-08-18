@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 import { Container } from 'inversify';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { DerivedRecordInput, EvaluateDerivedInput } from '../types';
@@ -313,5 +313,31 @@ describe('EvaluationService', () => {
     });
     expect(result.status).toBe('dry-run');
     expect(existsSync(result.path as string)).toBe(false);
+  });
+
+  it('does not repair a malformed existing evaluation file', async () => {
+    const x = await recordMachine('SYNTHETIC_MACHINE_X');
+    const first = await evaluate.evaluate({
+      outputDir,
+      evaluationsDir,
+      evaluatedRecordId: x.id as string,
+      evaluatorName: 'operator',
+      evidenceSupport: 'supported',
+      evaluatedAt: WHEN,
+      recordedAt: WHEN,
+    });
+    writeFileSync(first.path as string, '{not-json');
+    const retry = await evaluate.evaluate({
+      outputDir,
+      evaluationsDir,
+      evaluatedRecordId: x.id as string,
+      evaluatorName: 'operator',
+      evidenceSupport: 'supported',
+      evaluatedAt: WHEN,
+      recordedAt: WHEN,
+    });
+    expect(retry.status).toBe('invalid');
+    expect(retry.error).toContain('evaluation-conflict:invalid');
+    expect(readFileSync(first.path as string, 'utf-8')).toBe('{not-json');
   });
 });

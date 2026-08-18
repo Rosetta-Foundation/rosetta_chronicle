@@ -295,51 +295,94 @@ export class ProvenanceService implements IProvenanceService {
     reachable: ProvenanceRef[],
     failures: ProvenanceFailure[],
   ): Promise<void> {
-    for (const ref of reachable.filter((item) => item.kind === 'evaluation')) {
+    const evaluationRefs = reachable.filter(
+      (item) => item.kind === 'evaluation',
+    );
+    for (const ref of evaluationRefs) {
       if (!input.evaluationsDir) continue;
       const loaded = await this._evaluationStore.read(
         input.evaluationsDir,
         ref.id,
       );
-      if (loaded) {
-        const evaluated = await this._recordStore.read(
+      if (!loaded) continue;
+      const evaluated = await this._recordStore.read(
+        input.outputDir,
+        loaded.evaluatedRecordId,
+      );
+      if (!evaluated) {
+        const diagnosis = await this._recordStore.diagnose(
           input.outputDir,
           loaded.evaluatedRecordId,
         );
-        if (!evaluated) {
+        failures.push({
+          code:
+            diagnosis === 'invalid'
+              ? 'evaluated-record-invalid'
+              : 'evaluated-record-missing',
+          ref: { kind: 'derived-record', id: loaded.evaluatedRecordId },
+          citedBy: ref,
+        });
+      }
+      if (loaded.suppliedRecordId) {
+        const supplied = await this._recordStore.read(
+          input.outputDir,
+          loaded.suppliedRecordId,
+        );
+        if (!supplied) {
           const diagnosis = await this._recordStore.diagnose(
             input.outputDir,
-            loaded.evaluatedRecordId,
+            loaded.suppliedRecordId,
           );
           failures.push({
             code:
               diagnosis === 'invalid'
-                ? 'evaluated-record-invalid'
-                : 'evaluated-record-missing',
-            ref: { kind: 'derived-record', id: loaded.evaluatedRecordId },
+                ? 'supplied-record-invalid'
+                : 'supplied-record-missing',
+            ref: { kind: 'derived-record', id: loaded.suppliedRecordId },
             citedBy: ref,
           });
         }
-        if (loaded.suppliedRecordId) {
-          const supplied = await this._recordStore.read(
-            input.outputDir,
-            loaded.suppliedRecordId,
+      }
+      if (loaded.precedingEvaluationId) {
+        const preceding = await this._evaluationStore.read(
+          input.evaluationsDir,
+          loaded.precedingEvaluationId,
+        );
+        if (!preceding) {
+          const diagnosis = await this._evaluationStore.diagnose(
+            input.evaluationsDir,
+            loaded.precedingEvaluationId,
           );
-          if (!supplied) {
-            const diagnosis = await this._recordStore.diagnose(
-              input.outputDir,
-              loaded.suppliedRecordId,
-            );
-            failures.push({
-              code:
-                diagnosis === 'invalid'
-                  ? 'supplied-record-invalid'
-                  : 'supplied-record-missing',
-              ref: { kind: 'derived-record', id: loaded.suppliedRecordId },
-              citedBy: ref,
-            });
-          }
+          failures.push({
+            code:
+              diagnosis === 'invalid'
+                ? 'preceding-evaluation-invalid'
+                : 'preceding-evaluation-missing',
+            ref: {
+              kind: 'evaluation',
+              id: loaded.precedingEvaluationId,
+            },
+            citedBy: ref,
+          });
         }
+      }
+    }
+    for (const ref of evaluationRefs) {
+      if (!input.evaluationsDir) continue;
+      const loaded = await this._evaluationStore.read(
+        input.evaluationsDir,
+        ref.id,
+      );
+      if (loaded) continue;
+      if (
+        failures.some(
+          (item) =>
+            (item.code === 'preceding-evaluation-missing' ||
+              item.code === 'preceding-evaluation-invalid') &&
+            item.ref.kind === 'evaluation' &&
+            item.ref.id === ref.id,
+        )
+      ) {
         continue;
       }
       const diagnosis = await this._evaluationStore.diagnose(

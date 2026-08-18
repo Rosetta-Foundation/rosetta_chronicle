@@ -18,7 +18,10 @@ export interface IEvaluateHandler {
  * Root handler implementation of {@link IEvaluateHandler}.
  *
  * `evaluatedAt` is the human act's event time. `recordedAt` is
- * persistence time and is not part of evaluation identity. Daily
+ * persistence time and is not part of evaluation identity. Omitting
+ * both defaults them to the same `now` for a contemporaneous CLI
+ * write — that equality is not a schema invariant. A reconstructed
+ * evaluation may have `evaluatedAt` earlier than `recordedAt`. Daily
  * Chronicle tokens are not injected.
  */
 @injectable()

@@ -205,6 +205,14 @@ export const buildProvenanceEdges = (input: {
         }),
       );
     }
+    if (evaluation.precedingEvaluationId) {
+      edges.push(
+        edge('cites', from, {
+          kind: 'evaluation',
+          id: evaluation.precedingEvaluationId,
+        }),
+      );
+    }
   }
   return dedupeEdges(edges);
 };

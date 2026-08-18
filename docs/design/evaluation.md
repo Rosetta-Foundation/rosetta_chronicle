@@ -73,12 +73,25 @@ evidenceSupport?, personalRecognition?, noteRef?,
 suppliedRecordId?, precedingEvaluationId?
 ```
 
-`evaluatedAt` is the event time of the human act, not persist time.
-It participates in identity: 2026 and 2028 do not collapse.
+`evaluatedAt` is the event time of the human judgment. It
+participates in identity: 2026 and 2028 do not collapse.
 
-`recordedAt` is persist time and is **not** in the id.
+`recordedAt` is when Chronicle persisted that judgment. It is
+**not** in the id and must not be rewritten once the artifact exists.
+
+Those clocks are independent. A contemporaneous CLI write may default
+both to the same `now`; that equality is not a schema invariant.
+Reconstructed evaluations may have `evaluatedAt` earlier than
+`recordedAt`.
 
 The same payload with the same `evaluatedAt` is `already-present`.
+The store never overwrites an existing file. Identical content is a
+no-op; different content under the same id is an integrity failure.
+A malformed existing file is not repaired by overwrite.
+
+On read/diagnose the store recomputes `evaluationId` from identity-
+bearing fields and requires it to equal the stored id. If `note` and
+`noteRef` are both present, `sha256(note)` must equal `noteRef`.
 
 ## Append-only
 
@@ -103,7 +116,7 @@ bump `derived-record/1`.
 | --- | --- |
 | node `evaluation` | evaluation id |
 | edge `evaluates` | evaluation → evaluated derived |
-| edge `cites` | evaluation → supplied derived (correction only) |
+| edge `cites` | evaluation → supplied derived, or preceding evaluation |
 
 Disposition stays on the artifact. There are no `recognizes` /
 `rejects` / `corrects` / `supersedes` edges.
@@ -111,6 +124,16 @@ Disposition stays on the artifact. There are no `recognizes` /
 Stored `evaluates` points evaluation → derived. Forward still walks
 `source → execution → derived → evaluation`. Backward walks
 evaluation → derived → execution → definition / source.
+
+A later evaluation that cites a preceding evaluation walks:
+
+```text
+backward: later evaluation → preceding evaluation → its interpretation
+forward:  preceding evaluation → later evaluation
+```
+
+If that preceding evaluation later disappears, the walk is `partial`
+with `preceding-evaluation-missing`.
 
 ## Privacy
 

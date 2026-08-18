@@ -64,6 +64,61 @@ export const evaluationId = (input: {
   );
 
 /**
+ * Recompute identity and, when both are present, the note hash.
+ * A stored id that does not match these fields is corruption, not a
+ * different review.
+ */
+export const evaluationIntegrityOk = (
+  evaluation: DerivedEvaluation,
+): boolean => {
+  if (evaluation.evaluator.type !== 'human') return false;
+  if (!evaluation.evaluator.name.trim()) return false;
+  if (evaluation.note != null && evaluation.noteRef == null) return false;
+  if (
+    evaluation.note != null &&
+    evaluation.noteRef != null &&
+    sha256Hex(evaluation.note) !== evaluation.noteRef
+  ) {
+    return false;
+  }
+  return (
+    evaluationId({
+      evaluatedRecordId: evaluation.evaluatedRecordId,
+      evaluator: {
+        type: 'human',
+        name: evaluation.evaluator.name,
+      },
+      evaluatedAt: evaluation.evaluatedAt,
+      evidenceSupport: evaluation.evidenceSupport,
+      personalRecognition: evaluation.personalRecognition,
+      noteRef: evaluation.noteRef,
+      suppliedRecordId: evaluation.suppliedRecordId,
+      precedingEvaluationId: evaluation.precedingEvaluationId,
+    }) === evaluation.id
+  );
+};
+
+/** Shape + identity check. Null means unreadable as an evaluation. */
+export const asDerivedEvaluation = (
+  value: unknown,
+): DerivedEvaluation | null => {
+  if (!value || typeof value !== 'object') return null;
+  const rec = value as Record<string, unknown>;
+  if (rec.schemaVersion !== DERIVED_EVALUATION_VERSION) return null;
+  if (typeof rec.id !== 'string') return null;
+  if (typeof rec.evaluatedRecordId !== 'string') return null;
+  if (typeof rec.evaluatedAt !== 'string') return null;
+  if (typeof rec.recordedAt !== 'string') return null;
+  if (!rec.evaluator || typeof rec.evaluator !== 'object') return null;
+  const evaluator = rec.evaluator as Record<string, unknown>;
+  if (typeof evaluator.type !== 'string' || typeof evaluator.name !== 'string') {
+    return null;
+  }
+  const evaluation = value as DerivedEvaluation;
+  return evaluationIntegrityOk(evaluation) ? evaluation : null;
+};
+
+/**
  * Structural problems that block recording. Empty means the draft is
  * valid enough to attempt store resolution.
  */

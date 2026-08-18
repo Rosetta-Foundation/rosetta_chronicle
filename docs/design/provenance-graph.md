@@ -67,7 +67,7 @@ Handles only. Domain bodies stay in their stores.
 
 | Type | Meaning |
 | --- | --- |
-| `cites` | Execution → definition; execution or derived → source archive / conversation / node; evaluation → supplied derived |
+| `cites` | Execution → definition; execution or derived → source archive / conversation / node; evaluation → supplied derived or preceding evaluation |
 | `produces` | Execution → derived record |
 | `contains` | Archive → conversation → node (from a loaded source graph) |
 | `evaluates` | Evaluation → evaluated derived record |
@@ -125,9 +125,10 @@ failure code).
 definition, execution, derived record, graph, conversation, or node is
 `partial` with `definition-missing`, `definition-invalid`,
 `execution-missing`, `derived-missing`, `source-graph-missing`,
-`conversation-missing`, `node-missing`, or
+`conversation-missing`, `node-missing`,
 `evaluated-record-missing` when a previously valid evaluation later
-loses its derived target.
+loses its derived target, or `preceding-evaluation-missing` when a
+later evaluation's cited predecessor disappears.
 
 `partial` is this walker's integrity status. Machine interpretation
 does not add a new engine-wide status; a crash that leaves an

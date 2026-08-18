@@ -1,18 +1,22 @@
-import { mkdtempSync, readFileSync, rmSync } from 'fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { EvaluationStore } from '../repositories/evaluation-store.repository';
-import { DerivedEvaluation } from '../types';
+import { sha256Hex } from '../utils/chatgpt-export.utils';
+import { buildDerivedEvaluation } from '../utils/evaluation.utils';
 
-const evaluation = (): DerivedEvaluation => ({
-  schemaVersion: 'derived-evaluation/1',
-  id: 'c'.repeat(64),
-  evaluatedRecordId: 'a'.repeat(64),
-  evaluator: { type: 'human', name: 'fixture' },
-  evaluatedAt: '2026-08-18T22:00:00.000Z',
-  recordedAt: '2026-08-18T22:00:00.000Z',
-  evidenceSupport: 'supported',
-});
+const WHEN = '2026-08-18T22:00:00.000Z';
+const NOTE = 'SYNTHETIC_EVALUATION_NOTE';
+
+const evaluation = (
+  overrides: Parameters<typeof buildDerivedEvaluation>[0] = {
+    evaluatedRecordId: 'a'.repeat(64),
+    evaluator: { type: 'human', name: 'fixture' },
+    evaluatedAt: WHEN,
+    recordedAt: WHEN,
+    evidenceSupport: 'supported',
+  },
+) => buildDerivedEvaluation(overrides);
 
 describe('EvaluationStore', () => {
   let dir: string;
@@ -21,18 +25,83 @@ describe('EvaluationStore', () => {
   });
   afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
-  it('writes and reads an evaluation', async () => {
+  it('writes once and treats an identical rewrite as already-present', async () => {
     const store = new EvaluationStore();
     const record = evaluation();
     const path = await store.write(dir, record);
-    expect(JSON.parse(readFileSync(path, 'utf-8')).id).toBe(record.id);
+    const first = readFileSync(path, 'utf-8');
+    await store.write(dir, { ...record });
+    expect(readFileSync(path, 'utf-8')).toBe(first);
     expect(await store.read(dir, record.id)).toEqual(record);
-    expect(await store.list(dir)).toEqual([record]);
   });
 
-  it('diagnoses missing and invalid ids', async () => {
+  it('refuses a same-id write with different identity-bearing contents', async () => {
     const store = new EvaluationStore();
-    expect(await store.diagnose(dir, 'nope')).toBe('invalid');
-    expect(await store.diagnose(dir, 'd'.repeat(64))).toBe('missing');
+    const record = evaluation();
+    const path = await store.write(dir, record);
+    const first = readFileSync(path, 'utf-8');
+    await expect(
+      store.write(dir, {
+        ...record,
+        evidenceSupport: 'uncertain',
+      }),
+    ).rejects.toThrow('evaluation-conflict:identity');
+    expect(readFileSync(path, 'utf-8')).toBe(first);
+  });
+
+  it('refuses to overwrite a different recordedAt under the same id', async () => {
+    const store = new EvaluationStore();
+    const record = evaluation();
+    const path = await store.write(dir, record);
+    const first = readFileSync(path, 'utf-8');
+    await expect(
+      store.write(dir, {
+        ...record,
+        recordedAt: '2026-08-19T00:00:00.000Z',
+      }),
+    ).rejects.toThrow('evaluation-conflict:immutable');
+    expect(readFileSync(path, 'utf-8')).toBe(first);
+  });
+
+  it('treats a modified stored identity field as invalid', async () => {
+    const store = new EvaluationStore();
+    const record = evaluation();
+    const path = await store.write(dir, record);
+    const dumped = JSON.parse(readFileSync(path, 'utf-8'));
+    dumped.evidenceSupport = 'not-supported';
+    writeFileSync(path, JSON.stringify(dumped, null, 2) + '\n');
+    expect(await store.read(dir, record.id)).toBeNull();
+    expect(await store.diagnose(dir, record.id)).toBe('invalid');
+  });
+
+  it('treats a modified note with a stale noteRef as invalid', async () => {
+    const store = new EvaluationStore();
+    const record = evaluation({
+      evaluatedRecordId: 'a'.repeat(64),
+      evaluator: { type: 'human', name: 'fixture' },
+      evaluatedAt: WHEN,
+      recordedAt: WHEN,
+      evidenceSupport: 'supported',
+      note: NOTE,
+    });
+    const path = await store.write(dir, record);
+    expect(record.noteRef).toBe(sha256Hex(NOTE));
+    const dumped = JSON.parse(readFileSync(path, 'utf-8'));
+    dumped.note = 'SYNTHETIC_TAMPERED_NOTE';
+    writeFileSync(path, JSON.stringify(dumped, null, 2) + '\n');
+    expect(await store.read(dir, record.id)).toBeNull();
+    expect(await store.diagnose(dir, record.id)).toBe('invalid');
+  });
+
+  it('refuses to replace a malformed existing file', async () => {
+    const store = new EvaluationStore();
+    const record = evaluation();
+    writeFileSync(join(dir, `${record.id}.json`), '{not-json');
+    await expect(store.write(dir, record)).rejects.toThrow(
+      'evaluation-conflict:unreadable',
+    );
+    expect(readFileSync(join(dir, `${record.id}.json`), 'utf-8')).toBe(
+      '{not-json',
+    );
   });
 });

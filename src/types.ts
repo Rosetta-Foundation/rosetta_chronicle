@@ -814,8 +814,9 @@ export interface EvaluationActor {
  * Append-only human evaluation of one DerivedRecord.
  *
  * Does not mutate the evaluated record. `evaluatedAt` is the event time
- * of the human act and participates in identity. `recordedAt` is
- * persistence time and does not.
+ * of the human judgment and participates in identity. `recordedAt` is
+ * when Chronicle persisted that judgment and does not participate in
+ * identity. Those timestamps may differ; equality is not required.
  */
 export interface DerivedEvaluation {
   schemaVersion: 'derived-evaluation/1';
