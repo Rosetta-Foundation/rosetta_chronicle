@@ -174,5 +174,10 @@ describe('evaluation.utils', () => {
         }),
       ),
     ).toBeNull();
+    expect(
+      asDerivedEvaluation(
+        selfConsistent({ mysteryField: 'untracked-payload' }),
+      ),
+    ).toBeNull();
   });
 });

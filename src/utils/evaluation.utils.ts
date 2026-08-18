@@ -22,6 +22,22 @@ export const PERSONAL_RECOGNITION_VALUES = [
   'uncertain',
 ] as const satisfies readonly PersonalRecognition[];
 
+/** Closed `derived-evaluation/1` surface. Extra keys are not schema-valid. */
+export const DERIVED_EVALUATION_KEYS = [
+  'schemaVersion',
+  'id',
+  'evaluatedRecordId',
+  'evaluator',
+  'evaluatedAt',
+  'recordedAt',
+  'evidenceSupport',
+  'personalRecognition',
+  'noteRef',
+  'note',
+  'suppliedRecordId',
+  'precedingEvaluationId',
+] as const;
+
 const ISO_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/;
 
 export const isEvaluationTime = (value: unknown): value is string =>
@@ -73,6 +89,8 @@ export const evaluationId = (input: {
 export const evaluationSchemaOk = (
   rec: Record<string, unknown>,
 ): rec is Record<string, unknown> & DerivedEvaluation => {
+  const allowed = new Set<string>(DERIVED_EVALUATION_KEYS);
+  if (Object.keys(rec).some((key) => !allowed.has(key))) return false;
   if (rec.schemaVersion !== DERIVED_EVALUATION_VERSION) return false;
   if (typeof rec.id !== 'string' || !CONTENT_HASH.test(rec.id)) return false;
   if (

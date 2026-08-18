@@ -132,4 +132,19 @@ describe('EvaluationStore', () => {
     expect(await store.read(dir, id)).toBeNull();
     expect(await store.diagnose(dir, id)).toBe('invalid');
   });
+
+  it('rejects a self-consistent file with an unknown top-level field', async () => {
+    const store = new EvaluationStore();
+    const record = evaluation();
+    const extra = {
+      ...record,
+      mysteryField: 'untracked-payload',
+    };
+    writeFileSync(
+      join(dir, `${record.id}.json`),
+      JSON.stringify(extra, null, 2) + '\n',
+    );
+    expect(await store.read(dir, record.id)).toBeNull();
+    expect(await store.diagnose(dir, record.id)).toBe('invalid');
+  });
 });

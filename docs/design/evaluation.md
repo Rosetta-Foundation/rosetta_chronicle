@@ -92,8 +92,10 @@ A malformed existing file is not repaired by overwrite.
 On read/diagnose the store requires **schema validity and**
 content-addressed identity. A self-consistent file with an illegal
 enum, timestamp, or reference is invalid even if its id hashes to
-itself. If `note` is present, `noteRef` must be present and
-`sha256(note)` must equal `noteRef`.
+itself. Unknown top-level fields are invalid — the persisted object
+must conform to the `derived-evaluation/1` key allowlist. If `note`
+is present, `noteRef` must be present and `sha256(note)` must equal
+`noteRef`.
 
 `precedingEvaluationId` cites an earlier evaluation *act*. It is a
 general "responds to" relationship, not "previous evaluation of the
