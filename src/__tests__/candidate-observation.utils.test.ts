@@ -88,4 +88,27 @@ describe('parseCandidateObservationOutput', () => {
       ),
     ).toEqual({ error: 'invalid-output:too-many-observations' });
   });
+
+  it('sorts citedNodeIds so citation order is not identity', () => {
+    const parsed = parseCandidateObservationOutput(
+      JSON.stringify({
+        result: 'observations',
+        observations: [
+          {
+            statement: 'SYNTHETIC_DIRECT',
+            epistemicClass: 'directly-supported',
+            citedNodeIds: ['node-linear-2', 'node-linear-1'],
+          },
+        ],
+      }),
+      NODES,
+    );
+    expect(parsed).toEqual({
+      payloads: [
+        expect.objectContaining({
+          citedNodeIds: ['node-linear-1', 'node-linear-2'],
+        }),
+      ],
+    });
+  });
 });

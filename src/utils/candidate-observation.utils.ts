@@ -26,6 +26,7 @@ const citedAllowed = (cited: string[], allowed: Set<string>): boolean =>
 /**
  * Parse a model body into durable per-observation payloads.
  * The model may return a bundle; each payload is exactly one result.
+ * `citedNodeIds` are sorted; citation order is not identity.
  */
 export const parseCandidateObservationOutput = (
   text: string,
@@ -52,7 +53,7 @@ export const parseCandidateObservationOutput = (
     const payload: CandidateObservationPayload = {
       schemaVersion: CANDIDATE_OBSERVATION_SCHEMA,
       result: 'insufficient-evidence',
-      citedNodeIds: [...citedNodeIds],
+      citedNodeIds: [...citedNodeIds].sort(),
       ...(typeof parsed['supportNote'] === 'string'
         ? { supportNote: parsed['supportNote'] }
         : {}),
@@ -90,7 +91,7 @@ export const parseCandidateObservationOutput = (
       result: 'observation',
       statement: statement.trim(),
       epistemicClass: epistemicClass as 'directly-supported' | 'inferred',
-      citedNodeIds: [...citedNodeIds],
+      citedNodeIds: [...citedNodeIds].sort(),
       ...(typeof item['supportNote'] === 'string'
         ? { supportNote: item['supportNote'] }
         : {}),

@@ -79,7 +79,10 @@ describe('InterpretationService', () => {
   };
   let model: { invoke: jest.Mock };
 
-  const bind = (modelImpl: { invoke: jest.Mock }) => {
+  const bind = (
+    modelImpl: { invoke: jest.Mock },
+    occurrenceStore: unknown = ExecutionOccurrenceStore,
+  ) => {
     const container = new Container();
     container
       .bind(CHRONICLE_TOKENS.ChatGptExportRepository)
@@ -98,9 +101,15 @@ describe('InterpretationService', () => {
     container
       .bind(CHRONICLE_TOKENS.TransformationExecutionStore)
       .to(TransformationExecutionStore);
-    container
-      .bind(CHRONICLE_TOKENS.ExecutionOccurrenceStore)
-      .to(ExecutionOccurrenceStore);
+    if (typeof occurrenceStore === 'function') {
+      container
+        .bind(CHRONICLE_TOKENS.ExecutionOccurrenceStore)
+        .to(occurrenceStore as typeof ExecutionOccurrenceStore);
+    } else {
+      container
+        .bind(CHRONICLE_TOKENS.ExecutionOccurrenceStore)
+        .toConstantValue(occurrenceStore);
+    }
     container
       .bind(CHRONICLE_TOKENS.SourceContentRepository)
       .to(SourceContentRepository);
@@ -197,6 +206,7 @@ describe('InterpretationService', () => {
           },
         ],
       }),
+      modelVersion: 'synthetic-model-2026-08-18',
     });
     const result = await interpret.interpret(base());
     expect(result.status).toBe('recorded');
@@ -254,6 +264,9 @@ describe('InterpretationService', () => {
     expect(occurrence.providerStatus).toBe('succeeded');
     expect(occurrence.persistenceStatus).toBe('committed');
     expect(occurrence.outcome).toBe('observations');
+    expect(occurrence.modelVersion).toBe('synthetic-model-2026-08-18');
+    expect(occurrence.producer.model).toBe('synthetic-model');
+    expect(execution.configuration.modelVersion).toBeUndefined();
 
     const forward = await provenance.traverse({
       graphsDir,
@@ -380,6 +393,100 @@ describe('InterpretationService', () => {
     expect(second.occurrenceId).not.toBe(first.occurrenceId);
     expect(readdirSync(executionsDir)).toHaveLength(1);
     expect(readdirSync(occurrencesDir)).toHaveLength(2);
+  });
+
+  it('defaults startedAt at the provider call, not request createdAt', async () => {
+    model.invoke.mockImplementation(async () => ({
+      ok: true,
+      text: JSON.stringify({
+        result: 'observations',
+        observations: [
+          {
+            statement: 'SYNTHETIC_DIRECT',
+            epistemicClass: 'directly-supported',
+            citedNodeIds: ['node-linear-1'],
+          },
+        ],
+      }),
+    }));
+    const input = base();
+    delete input.startedAt;
+    delete input.nonce;
+    const result = await interpret.interpret(input);
+    expect(result.status).toBe('recorded');
+    const occurrenceId = result.occurrenceId as string;
+    const occurrence = JSON.parse(
+      readFileSync(join(occurrencesDir, `${occurrenceId}.json`), 'utf-8'),
+    );
+    expect(occurrence.startedAt).not.toBe(CREATED);
+    expect(occurrence.startedAt).toEqual(
+      expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
+    );
+    expect(occurrence.nonce).toEqual(expect.stringMatching(/^[a-f0-9]{32}$/));
+  });
+
+  it('keeps persistence committed when occurrence write fails after record', async () => {
+    model.invoke.mockResolvedValue({
+      ok: true,
+      text: JSON.stringify({
+        result: 'observations',
+        observations: [
+          {
+            statement: 'SYNTHETIC_DIRECT',
+            epistemicClass: 'directly-supported',
+            citedNodeIds: ['node-linear-1'],
+          },
+        ],
+      }),
+    });
+    bind(model, {
+      read: async () => null,
+      write: async () => {
+        throw new Error('disk-full');
+      },
+      pathFor: (dir: string, id: string) => join(dir, `${id}.json`),
+    });
+    const result = await interpret.interpret(base());
+    expect(result.status).toBe('occurrence-persist-failed');
+    expect(result.providerStatus).toBe('succeeded');
+    expect(result.persistenceStatus).toBe('committed');
+    expect(result.executionId).toEqual(expect.stringMatching(/^[a-f0-9]{64}$/));
+    expect(result.derivedIds).toHaveLength(1);
+    expect(result.occurrenceId).toBeUndefined();
+    expect(readdirSync(executionsDir)).toHaveLength(1);
+    expect(readdirSync(outputDir)).toHaveLength(1);
+    expect(readdirSync(occurrencesDir)).toEqual([]);
+  });
+
+  it('keeps persistence committed when occurrence write fails after already-present', async () => {
+    const text = JSON.stringify({
+      result: 'observations',
+      observations: [
+        {
+          statement: 'SYNTHETIC_DIRECT',
+          epistemicClass: 'directly-supported',
+          citedNodeIds: ['node-linear-1'],
+        },
+      ],
+    });
+    model.invoke.mockResolvedValue({ ok: true, text });
+    const first = await interpret.interpret(base());
+    expect(first.status).toBe('recorded');
+    bind(model, {
+      read: async () => null,
+      write: async () => {
+        throw new Error('disk-full');
+      },
+      pathFor: (dir: string, id: string) => join(dir, `${id}.json`),
+    });
+    const second = await interpret.interpret(base({ nonce: 'bb'.repeat(16) }));
+    expect(second.status).toBe('occurrence-persist-failed');
+    expect(second.providerStatus).toBe('succeeded');
+    expect(second.persistenceStatus).toBe('committed');
+    expect(second.executionId).toBe(first.executionId);
+    expect(second.derivedIds).toEqual(first.derivedIds);
+    expect(second.occurrenceId).toBeUndefined();
+    expect(readdirSync(occurrencesDir)).toHaveLength(1);
   });
 
   it('writes execution before derived and leaves no orphan on derived persist failure', async () => {

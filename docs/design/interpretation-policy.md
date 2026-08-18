@@ -91,7 +91,8 @@ type CandidateObservationPayload =
 ```
 
 One execution → 1–3 observation records **or** exactly one
-insufficient-evidence record.
+insufficient-evidence record. `citedNodeIds` are sorted before the
+payload is hashed; citation order is not semantic.
 
 `directly-supported` is a **machine classification of support**, not
 source truth. Only the cited nodes are source.
@@ -139,12 +140,44 @@ Timeout is `providerStatus: uncertain` with
 or derived files.
 
 Occurrence id is `sha256({ definitionId, sourceRefs, producer,
-configuration, startedAt, nonce })`. Output hashes are not in the id,
-so retries with a new nonce never collapse.
+configuration, startedAt, nonce })`. Output hashes, status, outcome,
+`endedAt`, and persistence result are not in the id. Those fields
+describe the invocation identified by `startedAt + nonce`; rewriting
+them under the same id would rewrite history.
+
+`startedAt` and `nonce` default **immediately before** the provider
+invoke. They identify the physical call, not interpret-request start.
+`createdAt` remains request/artifact time for definition and derived
+records. Tests may pin `startedAt` / `nonce`; the CLI does not.
+
+The store enforces append-only at the file boundary:
+
+```text
+file absent → write
+file present and semantically identical → already-present / no rewrite
+file present but different → integrity error
+```
+
+Requested `--model` lives on `producer` (and thus the execution).
+Provider-returned `modelVersion` lives on the occurrence only.
 
 No occurrence if the provider was never called (dry-run, unresolved
 source). Crash before a terminal provider result = no occurrence
 (accepted gap).
+
+If the occurrence receipt fails after execution + derived are durable:
+
+```text
+status = occurrence-persist-failed
+providerStatus = succeeded
+persistenceStatus = committed
+executionId / derivedIds present
+occurrenceId absent
+```
+
+The command exits nonzero. It must not report `not-committed` — the
+interpretation is already Chronicle memory. The same status is used
+for a newly recorded interpretation and an `already-present` retry.
 
 ## Crash states (append-only, not transactional)
 
@@ -188,9 +221,10 @@ CLI stdout does not print source text or observation statements.
 ## Producer and transport
 
 `DerivedProducer` for this path is `type: agent`,
-`name: chronicle-interpret`, plus `model`. `promptVersion` is not set;
-template id/hash live on definition policy and execution
-configuration. `providerRequestId` lives on the occurrence only.
+`name: chronicle-interpret`, plus the requested `model`.
+`promptVersion` is not set; template id/hash live on definition policy
+and execution configuration. `providerRequestId` and provider-returned
+`modelVersion` live on the occurrence only.
 
 E4a does not vendor a provider SDK. Chronicle does not depend on
 `sdlc-workflow`. Default transport is a fixture file

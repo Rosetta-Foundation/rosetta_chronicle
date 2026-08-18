@@ -50,6 +50,7 @@ export const buildExecutionOccurrence = (input: {
   executionId?: string;
   derivedIds?: string[];
   providerRequestId?: string;
+  modelVersion?: string;
 }): ExecutionOccurrence => ({
   id: executionOccurrenceId({
     definitionId: input.definitionId,
@@ -80,6 +81,7 @@ export const buildExecutionOccurrence = (input: {
   ...(input.providerRequestId
     ? { providerRequestId: input.providerRequestId }
     : {}),
+  ...(input.modelVersion ? { modelVersion: input.modelVersion } : {}),
 });
 
 export const validateOccurrenceId = (id: string): boolean =>

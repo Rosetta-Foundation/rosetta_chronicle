@@ -59,6 +59,7 @@ export interface IInterpretationService {
  *
  * Publication order for a live attempt:
  * definition → provider call → execution → derived → occurrence.
+ * Occurrence `startedAt` / `nonce` default immediately before invoke.
  * Dry-run validates and hashes in memory only.
  */
 @injectable()
@@ -115,9 +116,10 @@ export class InterpretationService implements IInterpretationService {
       model: input.model,
     };
     const configuration = this.configuration(input);
+    const prompt = expandCandidateObservationPrompt(nodes);
+    // Occurrence identity: clocks of this physical provider call.
     const startedAt = input.startedAt ?? new Date().toISOString();
     const nonce = input.nonce ?? randomBytes(16).toString('hex');
-    const prompt = expandCandidateObservationPrompt(nodes);
     const modelResult = await this._model.invoke({
       provider: input.provider,
       model: input.model,
@@ -152,6 +154,7 @@ export class InterpretationService implements IInterpretationService {
                 : 'invalid-output',
         error: `provider:${modelResult.failureClass}`,
         providerRequestId: undefined,
+        modelVersion: undefined,
       });
     }
 
@@ -175,6 +178,7 @@ export class InterpretationService implements IInterpretationService {
         status: 'invalid-output',
         error: parsed.error,
         providerRequestId: modelResult.providerRequestId,
+        modelVersion: modelResult.modelVersion,
       });
     }
 
@@ -221,6 +225,7 @@ export class InterpretationService implements IInterpretationService {
         status: 'persist-failed',
         error: persisted.error,
         providerRequestId: modelResult.providerRequestId,
+        modelVersion: modelResult.modelVersion,
       });
     }
 
@@ -244,6 +249,7 @@ export class InterpretationService implements IInterpretationService {
       epistemicClasses: parsed.payloads.map(epistemicClassOf),
       reviewState: 'unreviewed',
       providerRequestId: modelResult.providerRequestId,
+      modelVersion: modelResult.modelVersion,
     });
   }
 
@@ -419,6 +425,7 @@ export class InterpretationService implements IInterpretationService {
     epistemicClasses?: string[];
     reviewState?: InterpretSourceResult['reviewState'];
     providerRequestId?: string;
+    modelVersion?: string;
   }): Promise<InterpretSourceResult> {
     const occurrence = buildExecutionOccurrence({
       definitionId: input.definition.id,
@@ -436,6 +443,7 @@ export class InterpretationService implements IInterpretationService {
       executionId: input.executionId,
       derivedIds: input.derivedIds,
       providerRequestId: input.providerRequestId,
+      modelVersion: input.modelVersion,
     });
     try {
       await this._occurrenceStore.write(
@@ -443,18 +451,24 @@ export class InterpretationService implements IInterpretationService {
         occurrence,
       );
     } catch {
+      const interpretationCommitted =
+        input.persistenceStatus === 'committed';
       return {
-        status: input.status === 'recorded' ? 'persist-failed' : input.status,
+        status: interpretationCommitted
+          ? 'occurrence-persist-failed'
+          : input.status,
         definitionId: input.definition.id,
         executionId: input.executionId,
         derivedIds: input.derivedIds,
         providerStatus: input.providerStatus,
-        persistenceStatus: 'not-committed',
+        persistenceStatus: input.persistenceStatus,
         outcome: input.outcome,
         observationCount: input.observationCount,
         epistemicClasses: input.epistemicClasses,
         reviewState: input.reviewState,
-        error: input.error ?? 'occurrence-persist-failed',
+        error: interpretationCommitted
+          ? 'occurrence-persist-failed'
+          : (input.error ?? 'occurrence-persist-failed'),
       };
     }
     return {

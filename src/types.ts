@@ -696,6 +696,8 @@ export interface ExecutionOccurrence {
   executionId?: string;
   derivedIds?: string[];
   providerRequestId?: string;
+  /** Concrete model/version the provider reported for this invoke. */
+  modelVersion?: string;
 }
 
 /** Input to machine interpretation. Content is never caller-supplied. */
@@ -728,7 +730,8 @@ export type InterpretSourceStatus =
   | 'uncertain'
   | 'refused'
   | 'invalid-output'
-  | 'persist-failed';
+  | 'persist-failed'
+  | 'occurrence-persist-failed';
 
 /**
  * Result of interpret-source. Never includes source text or observation
