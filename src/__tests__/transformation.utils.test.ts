@@ -1,9 +1,12 @@
 import { TransformationExecution } from '../types';
 import { sha256Hex } from '../utils/chatgpt-export.utils';
 import {
+  buildTransformationDefinition,
   buildTransformationExecution,
   diffExecutions,
+  transformationDefinitionHash,
   transformationExecutionId,
+  validateTransformationDefinition,
   validateTransformationDraft,
 } from '../utils/transformation.utils';
 
@@ -14,11 +17,21 @@ const refs = [
   { sourceGraphHash: HASH, conversationId: 'conv-1', nodeIds: ['n1'] },
 ];
 const producer = { type: 'human' as const, name: 'fixture' };
+const DEFINITION_ID = 'c'.repeat(64);
+
+const recipe = {
+  type: 'human-note' as const,
+  version: '1',
+  description: 'Caller-supplied note citing source-graph structure.',
+  deterministic: true,
+  allowedProducerTypes: ['human' as const, 'agent' as const],
+};
 
 const execution = (
   overrides: Partial<TransformationExecution> = {},
 ): TransformationExecution =>
   buildTransformationExecution({
+    definitionId: DEFINITION_ID,
     transformationType: 'human-note',
     transformationVersion: '1',
     sourceRefs: refs,
@@ -38,6 +51,7 @@ describe('transformation.utils', () => {
     expect(a.id).toBe(b.id);
     expect(a.id).toBe(
       transformationExecutionId({
+        definitionId: DEFINITION_ID,
         transformationType: 'human-note',
         transformationVersion: '1',
         sourceRefs: refs,
@@ -79,5 +93,21 @@ describe('transformation.utils', () => {
     const fields = diffExecutions(left, right).map((row) => row.field);
     expect(fields).toEqual(['configuration', 'outputContentRefs']);
     expect(diffExecutions(left, left)).toEqual([]);
+  });
+
+  it('keeps definition identity on the hash, not createdAt', () => {
+    const a = buildTransformationDefinition(recipe, '2026-08-17T21:00:00.000Z');
+    const b = buildTransformationDefinition(recipe, '2026-08-18T00:00:00.000Z');
+    expect(a.id).toBe(b.id);
+    expect(a.id).toBe(transformationDefinitionHash(recipe));
+    expect(a.contentHash).toBe(a.id);
+    const changed = buildTransformationDefinition(
+      { ...recipe, description: 'Revised human-note recipe.' },
+      a.createdAt,
+    );
+    expect(changed.id).not.toBe(a.id);
+    expect(
+      validateTransformationDefinition({ ...a, contentHash: 'd'.repeat(64) }),
+    ).toContain('definition-hash-mismatch');
   });
 });

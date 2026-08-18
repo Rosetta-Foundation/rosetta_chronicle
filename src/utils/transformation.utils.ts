@@ -3,7 +3,9 @@ import {
   DerivedSourceRef,
   DerivedTransformationType,
   ProvenanceDifference,
+  TransformationDefinition,
   TransformationExecution,
+  TransformationRecipe,
 } from '../types';
 import { sha256Hex } from './chatgpt-export.utils';
 import { CONTENT_HASH } from './derived-record.utils';
@@ -25,11 +27,76 @@ export const stableObject = (
 };
 
 /**
- * Immutable execution id: recipe + refs + producer + configuration +
- * output content hashes. Not createdAt. Not derived-record ids (those
- * are assigned after content hashes exist).
+ * Immutable definition id: recipe fields only. Not createdAt. Changing
+ * description or flags is a new artifact, even if type@version matches.
+ */
+export const transformationDefinitionHash = (
+  recipe: TransformationRecipe,
+): string =>
+  sha256Hex(
+    JSON.stringify({
+      type: recipe.type,
+      version: recipe.version,
+      description: recipe.description,
+      deterministic: recipe.deterministic,
+      allowedProducerTypes: [...recipe.allowedProducerTypes].sort(),
+    }),
+  );
+
+/** Persist a bootstrap recipe. `createdAt` is not part of identity. */
+export const buildTransformationDefinition = (
+  recipe: TransformationRecipe,
+  createdAt: string,
+): TransformationDefinition => {
+  const contentHash = transformationDefinitionHash(recipe);
+  return {
+    id: contentHash,
+    type: recipe.type,
+    version: recipe.version,
+    description: recipe.description,
+    deterministic: recipe.deterministic,
+    allowedProducerTypes: [...recipe.allowedProducerTypes],
+    createdAt,
+    contentHash,
+  };
+};
+
+/** Structural problems that block persisting a definition. */
+export const validateTransformationDefinition = (
+  definition: TransformationDefinition,
+): string[] => {
+  const errors: string[] = [];
+  if (!CONTENT_HASH.test(definition.id)) {
+    errors.push('definition-id-invalid');
+  }
+  if (!CONTENT_HASH.test(definition.contentHash)) {
+    errors.push('definition-hash-invalid');
+  }
+  const expected = transformationDefinitionHash(definition);
+  if (definition.contentHash !== expected) {
+    errors.push('definition-hash-mismatch');
+  }
+  if (definition.id !== definition.contentHash) {
+    errors.push('definition-id-hash-mismatch');
+  }
+  if (!definition.description.trim()) {
+    errors.push('definition-description-missing');
+  }
+  if (definition.allowedProducerTypes.length === 0) {
+    errors.push('definition-producers-missing');
+  }
+  if (!RECIPE_VERSION.test(definition.version)) {
+    errors.push(`unknown-transformation-version:${definition.version}`);
+  }
+  return errors;
+};
+
+/**
+ * Immutable execution id: definition + refs + producer + configuration
+ * + output content hashes. Not createdAt. Not derived-record ids.
  */
 export const transformationExecutionId = (input: {
+  definitionId: string;
   transformationType: DerivedTransformationType;
   transformationVersion: string;
   sourceRefs: DerivedSourceRef[];
@@ -39,6 +106,7 @@ export const transformationExecutionId = (input: {
 }): string =>
   sha256Hex(
     JSON.stringify({
+      definitionId: input.definitionId,
       transformationType: input.transformationType,
       transformationVersion: input.transformationVersion,
       sourceRefs: input.sourceRefs,
@@ -79,6 +147,7 @@ export const validateTransformationDraft = (input: {
  * whose hashes are `outputContentRefs`.
  */
 export const buildTransformationExecution = (input: {
+  definitionId: string;
   transformationType: DerivedTransformationType;
   transformationVersion: string;
   sourceRefs: DerivedSourceRef[];
@@ -90,6 +159,7 @@ export const buildTransformationExecution = (input: {
   outputContentRefs: string[];
 }): TransformationExecution => ({
   id: transformationExecutionId({
+    definitionId: input.definitionId,
     transformationType: input.transformationType,
     transformationVersion: input.transformationVersion,
     sourceRefs: input.sourceRefs,
@@ -97,6 +167,7 @@ export const buildTransformationExecution = (input: {
     configuration: input.configuration,
     outputContentRefs: input.outputContentRefs,
   }),
+  definitionId: input.definitionId,
   transformationType: input.transformationType,
   transformationVersion: input.transformationVersion,
   sourceRefs: input.sourceRefs,
@@ -126,6 +197,7 @@ export const diffExecutions = (
   right: TransformationExecution,
 ): ProvenanceDifference[] =>
   [
+    compareField('definitionId', left.definitionId, right.definitionId),
     compareField(
       'transformationType',
       left.transformationType,

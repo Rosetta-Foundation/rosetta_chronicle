@@ -52,9 +52,10 @@ Usage:
   chronicle inventory-chatgpt --export <path>
   chronicle import-chatgpt --export <path> --output <dir> [--dry-run]
   chronicle record-derived --output <dir> --source-graph-hash <hex> --type <kind> --producer-type <human|agent> --producer-name <name> --content <text> [--dry-run]
-  chronicle transform-record --type <kind> --version <n> --source-graph-hash <hex> --output <dir> --executions <dir> --producer-type <human|agent> --producer-name <name> --content <text> [--dry-run]
-  chronicle transformation-provenance --derived <id> --output <dir> --executions <dir>
-  chronicle transformation-provenance --execution <id> --executions <dir>
+  chronicle transform-record --type <kind> --version <n> --source-graph-hash <hex> --output <dir> --executions <dir> --definitions <dir> --producer-type <human|agent> --producer-name <name> --content <text> [--dry-run]
+  chronicle transformation-provenance --derived <id> --output <dir> --executions <dir> --definitions <dir>
+  chronicle transformation-provenance --execution <id> --executions <dir> --definitions <dir>
+  chronicle transformation-provenance --definition <id> --definitions <dir> --executions <dir>
   chronicle transformation-provenance --source-graph-hash <hex> --executions <dir>
   chronicle transformation-provenance --compare <id> --with <id> --executions <dir>
   chronicle queue [show] [--repo <path>]
@@ -116,6 +117,8 @@ Options:
                       $CHRONICLE_DERIVED_DIR.
   --executions <dir>  Directory for transformation execution JSON.
                       Falls back to $CHRONICLE_EXECUTION_DIR.
+  --definitions <dir> Directory for persisted transformation definitions.
+                      Falls back to $CHRONICLE_DEFINITION_DIR.
   --source-graph-hash <hex>
                       Archive content hash the derived record cites.
   --source-ref <hex>  Alias for --source-graph-hash.
@@ -123,6 +126,7 @@ Options:
   --config <json>     Optional JSON object stored on the execution.
   --derived <id>      Derived-record id for transformation-provenance.
   --execution <id>    Execution id for transformation-provenance.
+  --definition <id>   Definition id for transformation-provenance.
   --compare <id>      First execution id to compare.
   --with <id>         Second execution id to compare.
   --conversation-id <id>
@@ -160,6 +164,9 @@ Environment variables:
   CHRONICLE_EXECUTION_DIR
                       Default --executions for transform-record and
                       transformation-provenance.
+  CHRONICLE_DEFINITION_DIR
+                      Default --definitions for transform-record and
+                      transformation-provenance.
 `.trim();
 
 interface ParsedArgs {
@@ -196,6 +203,8 @@ interface ParsedArgs {
   confidence?: number;
   reviewState?: string;
   executionsDir?: string;
+  definitionsDir?: string;
+  definitionId?: string;
   transformationVersion?: string;
   configJson?: string;
   derivedId?: string;
@@ -296,6 +305,12 @@ function parseArgs(argv: string[]): ParsedArgs {
         break;
       case '--executions':
         result.executionsDir = args[++i];
+        break;
+      case '--definitions':
+        result.definitionsDir = args[++i];
+        break;
+      case '--definition':
+        result.definitionId = args[++i];
         break;
       case '--version':
         result.transformationVersion = args[++i];
@@ -785,6 +800,12 @@ async function runTransformRecord(args: ParsedArgs): Promise<void> {
     die(
       '--executions <dir> (or $CHRONICLE_EXECUTION_DIR) is required for transform-record',
     );
+  const definitionsDir =
+    args.definitionsDir ?? process.env['CHRONICLE_DEFINITION_DIR'];
+  if (!definitionsDir)
+    die(
+      '--definitions <dir> (or $CHRONICLE_DEFINITION_DIR) is required for transform-record',
+    );
   if (!args.sourceGraphHash)
     die('--source-graph-hash (or --source-ref) is required for transform-record');
   if (!args.transformationType) die('--type is required for transform-record');
@@ -813,6 +834,7 @@ async function runTransformRecord(args: ParsedArgs): Promise<void> {
   const result = await handler.handle({
     outputDir,
     executionsDir,
+    definitionsDir,
     sourceGraphHash: args.sourceGraphHash,
     conversationId: args.conversationId,
     nodeIds: args.nodeIds,
@@ -846,12 +868,24 @@ async function runTransformationProvenance(args: ParsedArgs): Promise<void> {
     die(
       '--executions <dir> (or $CHRONICLE_EXECUTION_DIR) is required for transformation-provenance',
     );
+  const definitionsDir =
+    args.definitionsDir ?? process.env['CHRONICLE_DEFINITION_DIR'];
+  const needsDefinitions = Boolean(
+    args.derivedId || args.executionId || args.definitionId,
+  );
+  if (needsDefinitions && !definitionsDir) {
+    die(
+      '--definitions <dir> (or $CHRONICLE_DEFINITION_DIR) is required when walking from --derived, --execution, or --definition',
+    );
+  }
   const handler = getTransformationHandler();
   const result = await handler.provenance({
     executionsDir,
+    definitionsDir,
     outputDir: args.outputDir ?? process.env['CHRONICLE_DERIVED_DIR'],
     derivedId: args.derivedId,
     executionId: args.executionId,
+    definitionId: args.definitionId,
     sourceGraphHash: args.sourceGraphHash,
     compareId: args.compareId,
     withId: args.withId,

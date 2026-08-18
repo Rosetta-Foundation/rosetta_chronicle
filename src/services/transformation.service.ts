@@ -7,10 +7,13 @@ import {
   ProvenanceResult,
   TransformRecordInput,
   TransformRecordResult,
+  TransformationDefinition,
   TransformationExecution,
+  TransformationRecipe,
 } from '../types';
 import type { IChatGptGraphStore } from '../repositories/chatgpt-graph-store.repository';
 import type { IDerivedRecordStore } from '../repositories/derived-record-store.repository';
+import type { ITransformationDefinitionStore } from '../repositories/transformation-definition-store.repository';
 import type { ITransformationExecutionStore } from '../repositories/transformation-execution-store.repository';
 import type { ITransformationRegistry } from '../repositories/transformation-registry.repository';
 import {
@@ -20,6 +23,7 @@ import {
   validateSourceRefsOnGraph,
 } from '../utils/derived-record.utils';
 import {
+  buildTransformationDefinition,
   buildTransformationExecution,
   diffExecutions,
   validateTransformationDraft,
@@ -40,15 +44,17 @@ export interface ITransformationService {
 /**
  * Transformation implementation of {@link ITransformationService}.
  *
- * Depends only on repositories (registry, execution store, derived
- * store, optional graph store). Re-run of the same identity is a no-op
- * and keeps the original `createdAt` on both records.
+ * Depends only on repositories (registry, definition store, execution
+ * store, derived store, optional graph store). Re-run of the same
+ * identity is a no-op and keeps the original `createdAt`.
  */
 @injectable()
 export class TransformationService implements ITransformationService {
   constructor(
     @inject(CHRONICLE_TOKENS.TransformationRegistry)
     private readonly _registry: ITransformationRegistry,
+    @inject(CHRONICLE_TOKENS.TransformationDefinitionStore)
+    private readonly _definitionStore: ITransformationDefinitionStore,
     @inject(CHRONICLE_TOKENS.TransformationExecutionStore)
     private readonly _executionStore: ITransformationExecutionStore,
     @inject(CHRONICLE_TOKENS.DerivedRecordStore)
@@ -80,16 +86,16 @@ export class TransformationService implements ITransformationService {
       return this.invalid(draftErrors.join(', '));
     }
 
-    const definition = this._registry.get(
+    const recipe = this._registry.get(
       input.transformationType,
       input.transformationVersion,
     );
-    if (!definition) {
+    if (!recipe) {
       return this.invalid(
         `unknown-transformation:${input.transformationType}@${input.transformationVersion}`,
       );
     }
-    if (!definition.allowedProducerTypes.includes(input.createdBy.type)) {
+    if (!recipe.allowedProducerTypes.includes(input.createdBy.type)) {
       return this.invalid(
         `producer-not-allowed:${input.createdBy.type}`,
       );
@@ -110,6 +116,12 @@ export class TransformationService implements ITransformationService {
     const createdAt = input.createdAt ?? new Date().toISOString();
     const reviewState =
       input.reviewState ?? defaultReviewState(input.createdBy.type);
+    const definition = await this.persistDefinition(
+      input.definitionsDir,
+      recipe,
+      createdAt,
+      input.dryRun === true,
+    );
     const contents = [input.content, ...(input.extraContents ?? [])];
     const drafts = contents.map((content) =>
       buildDerivedRecord({
@@ -123,13 +135,14 @@ export class TransformationService implements ITransformationService {
       }),
     );
     const execution = buildTransformationExecution({
+      definitionId: definition.id,
       transformationType: input.transformationType,
       transformationVersion: input.transformationVersion,
       sourceRefs,
       producer: input.createdBy,
       createdAt,
       configuration: input.configuration ?? {},
-      deterministic: definition.deterministic,
+      deterministic: recipe.deterministic,
       outputRefs: drafts.map((record) => record.id),
       outputContentRefs: drafts.map((record) => record.contentRef),
     });
@@ -146,18 +159,18 @@ export class TransformationService implements ITransformationService {
       return this.toResult(
         'already-present',
         existing,
+        definition,
         records,
-        input.outputDir,
-        input.executionsDir,
+        input,
       );
     }
     if (input.dryRun) {
       return this.toResult(
         'recorded',
         execution,
+        definition,
         records,
-        input.outputDir,
-        input.executionsDir,
+        input,
       );
     }
     for (const record of records) {
@@ -170,9 +183,9 @@ export class TransformationService implements ITransformationService {
     return this.toResult(
       'recorded',
       execution,
+      definition,
       records,
-      input.outputDir,
-      input.executionsDir,
+      input,
     );
   }
 
@@ -183,6 +196,7 @@ export class TransformationService implements ITransformationService {
       query.executionId,
       query.sourceGraphHash,
       query.compareId,
+      query.definitionId,
     ].filter((value) => value != null && value !== '');
     if (modes.length !== 1) {
       return {
@@ -193,6 +207,7 @@ export class TransformationService implements ITransformationService {
     if (query.derivedId) return this.fromDerived(query);
     if (query.executionId) return this.fromExecution(query);
     if (query.sourceGraphHash) return this.fromSource(query);
+    if (query.definitionId) return this.fromDefinition(query);
     return this.compare(query);
   }
 
@@ -221,14 +236,15 @@ export class TransformationService implements ITransformationService {
     if (!execution) {
       return { status: 'not-found', derivedId, error: 'execution-missing' };
     }
-    return {
+    return this.withDefinition(query, {
       status: 'ok',
       derivedId,
       executionId: execution.id,
+      definitionId: execution.definitionId,
       sourceRefs: execution.sourceRefs,
       derivedIds: execution.outputRefs,
       execution,
-    };
+    });
   }
 
   private async fromExecution(
@@ -245,13 +261,14 @@ export class TransformationService implements ITransformationService {
         error: 'execution-missing',
       };
     }
-    return {
+    return this.withDefinition(query, {
       status: 'ok',
       executionId: execution.id,
+      definitionId: execution.definitionId,
       sourceRefs: execution.sourceRefs,
       derivedIds: execution.outputRefs,
       execution,
-    };
+    });
   }
 
   private async fromSource(
@@ -265,6 +282,48 @@ export class TransformationService implements ITransformationService {
     return {
       status: 'ok',
       sourceRefs: [{ sourceGraphHash: hash, nodeIds: [] }],
+      executionIds: matched.map((row) => row.id),
+      derivedIds: matched.flatMap((row) => row.outputRefs),
+    };
+  }
+
+  private async fromDefinition(
+    query: ProvenanceQuery,
+  ): Promise<ProvenanceResult> {
+    const definitionId = query.definitionId as string;
+    if (!query.definitionsDir) {
+      return {
+        status: 'invalid',
+        definitionId,
+        error: 'definitions-dir-required',
+      };
+    }
+    const listed = await this._executionStore.list(query.executionsDir);
+    const matched = listed.filter((row) => row.definitionId === definitionId);
+    const definition = await this._definitionStore.read(
+      query.definitionsDir,
+      definitionId,
+    );
+    if (!definition) {
+      const diagnosis = await this._definitionStore.diagnose(
+        query.definitionsDir,
+        definitionId,
+      );
+      return {
+        status: 'not-found',
+        definitionId,
+        error:
+          diagnosis === 'missing'
+            ? 'definition-missing'
+            : 'definition-invalid',
+        executionIds: matched.map((row) => row.id),
+        derivedIds: matched.flatMap((row) => row.outputRefs),
+      };
+    }
+    return {
+      status: 'ok',
+      definitionId,
+      definition,
       executionIds: matched.map((row) => row.id),
       derivedIds: matched.flatMap((row) => row.outputRefs),
     };
@@ -292,6 +351,66 @@ export class TransformationService implements ITransformationService {
     };
   }
 
+  private async persistDefinition(
+    definitionsDir: string,
+    recipe: TransformationRecipe,
+    createdAt: string,
+    dryRun: boolean,
+  ): Promise<TransformationDefinition> {
+    const draft = buildTransformationDefinition(recipe, createdAt);
+    const existing = await this._definitionStore.read(
+      definitionsDir,
+      draft.id,
+    );
+    if (existing) return existing;
+    if (!dryRun) {
+      await this._definitionStore.write(definitionsDir, draft);
+    }
+    return draft;
+  }
+
+  /**
+   * Resolve the cited definition or fail honestly. A `definitionId` on
+   * an execution is required provenance — omitting the store, or
+   * failing to read the artifact, is not equivalent to success.
+   */
+  private async withDefinition(
+    query: ProvenanceQuery,
+    result: ProvenanceResult,
+  ): Promise<ProvenanceResult> {
+    if (!result.definitionId) {
+      return {
+        ...result,
+        status: 'invalid',
+        error: 'definition-id-missing',
+      };
+    }
+    if (!query.definitionsDir) {
+      return {
+        ...result,
+        status: 'invalid',
+        error: 'definitions-dir-required',
+      };
+    }
+    const definition = await this._definitionStore.read(
+      query.definitionsDir,
+      result.definitionId,
+    );
+    if (definition) return { ...result, definition };
+    const diagnosis = await this._definitionStore.diagnose(
+      query.definitionsDir,
+      result.definitionId,
+    );
+    return {
+      ...result,
+      status: 'not-found',
+      error:
+        diagnosis === 'missing'
+          ? 'definition-missing'
+          : 'definition-invalid',
+    };
+  }
+
   private sourceRef(input: TransformRecordInput): DerivedSourceRef {
     return {
       sourceGraphHash: input.sourceGraphHash,
@@ -309,20 +428,25 @@ export class TransformationService implements ITransformationService {
   private toResult(
     status: 'recorded' | 'already-present',
     execution: TransformationExecution,
+    definition: TransformationDefinition,
     records: DerivedRecord[],
-    outputDir: string,
-    executionsDir: string,
+    input: TransformRecordInput,
   ): TransformRecordResult {
     return {
       status,
       executionId: execution.id,
       executionPath: this._executionStore.pathFor(
-        executionsDir,
+        input.executionsDir,
         execution.id,
+      ),
+      definitionId: definition.id,
+      definitionPath: this._definitionStore.pathFor(
+        input.definitionsDir,
+        definition.id,
       ),
       derivedIds: records.map((record) => record.id),
       derivedPaths: records.map((record) =>
-        this._recordStore.pathFor(outputDir, record.id),
+        this._recordStore.pathFor(input.outputDir, record.id),
       ),
       createdAt: execution.createdAt,
     };

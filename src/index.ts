@@ -93,6 +93,10 @@ import {
   TransformationRegistry,
 } from './repositories/transformation-registry.repository';
 import {
+  ITransformationDefinitionStore,
+  TransformationDefinitionStore,
+} from './repositories/transformation-definition-store.repository';
+import {
   ITransformationExecutionStore,
   TransformationExecutionStore,
 } from './repositories/transformation-execution-store.repository';
@@ -146,6 +150,11 @@ export const buildContainer = (): Container => {
   container
     .bind<ITransformationRegistry>(CHRONICLE_TOKENS.TransformationRegistry)
     .to(TransformationRegistry);
+  container
+    .bind<ITransformationDefinitionStore>(
+      CHRONICLE_TOKENS.TransformationDefinitionStore,
+    )
+    .to(TransformationDefinitionStore);
   container
     .bind<ITransformationExecutionStore>(
       CHRONICLE_TOKENS.TransformationExecutionStore,

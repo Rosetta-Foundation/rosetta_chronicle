@@ -24,6 +24,7 @@ describe('TransformationHandler', () => {
     await handler.handle({
       outputDir: '/out',
       executionsDir: '/exec',
+      definitionsDir: '/defs',
       sourceGraphHash: 'a'.repeat(64),
       nodeIds: [],
       transformationType: 'human-note',

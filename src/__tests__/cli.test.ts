@@ -198,6 +198,7 @@ describe('chronicle CLI', () => {
   it('transform-record writes execution and derived without Daily Chronicle', () => {
     const out = mkdtempSync(join(tmpdir(), 'cli-xform-'));
     const execDir = mkdtempSync(join(tmpdir(), 'cli-exec-'));
+    const defDir = mkdtempSync(join(tmpdir(), 'cli-def-'));
     try {
       const result = spawnSync(
         process.execPath,
@@ -208,6 +209,8 @@ describe('chronicle CLI', () => {
           out,
           '--executions',
           execDir,
+          '--definitions',
+          defDir,
           '--source-ref',
           'a'.repeat(64),
           '--type',
@@ -227,8 +230,12 @@ describe('chronicle CLI', () => {
       const parsed = JSON.parse(result.stdout);
       expect(parsed.status).toBe('recorded');
       expect(existsSync(parsed.executionPath)).toBe(true);
+      expect(existsSync(parsed.definitionPath)).toBe(true);
       expect(existsSync(parsed.derivedPaths[0])).toBe(true);
       expect(existsSync(join(out, 'chronicles'))).toBe(false);
+      expect(readFileSync(parsed.definitionPath, 'utf-8')).not.toContain(
+        'SYNTHETIC_DERIVED_NOTE',
+      );
       const walk = spawnSync(
         process.execPath,
         [
@@ -240,16 +247,41 @@ describe('chronicle CLI', () => {
           out,
           '--executions',
           execDir,
+          '--definitions',
+          defDir,
         ],
         { encoding: 'utf-8' },
       );
       expect(walk.status).toBe(0);
       const provenance = JSON.parse(walk.stdout);
       expect(provenance.executionId).toBe(parsed.executionId);
+      expect(provenance.definitionId).toBe(parsed.definitionId);
+      expect(provenance.definition.type).toBe('human-note');
     } finally {
       rmSync(out, { recursive: true, force: true });
       rmSync(execDir, { recursive: true, force: true });
+      rmSync(defDir, { recursive: true, force: true });
     }
+  });
+
+  it('transformation-provenance --execution requires --definitions', () => {
+    const result = spawnSync(
+      process.execPath,
+      [
+        CLI,
+        'transformation-provenance',
+        '--execution',
+        'a'.repeat(64),
+        '--executions',
+        mkdtempSync(join(tmpdir(), 'cli-exec-req-')),
+      ],
+      {
+        encoding: 'utf-8',
+        env: { ...process.env, CHRONICLE_DEFINITION_DIR: undefined },
+      },
+    );
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('--definitions');
   });
 
   it('exits 1 with unknown command', () => {

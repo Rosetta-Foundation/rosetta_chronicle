@@ -40,5 +40,6 @@ export const CHRONICLE_TOKENS = {
   ChatGptGraphStore: Symbol.for('ChatGptGraphStore'),
   DerivedRecordStore: Symbol.for('DerivedRecordStore'),
   TransformationRegistry: Symbol.for('TransformationRegistry'),
+  TransformationDefinitionStore: Symbol.for('TransformationDefinitionStore'),
   TransformationExecutionStore: Symbol.for('TransformationExecutionStore'),
 } as const;
