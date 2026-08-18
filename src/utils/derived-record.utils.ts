@@ -11,7 +11,7 @@ import { sha256Hex } from './chatgpt-export.utils';
 export const DERIVED_RECORD_VERSION = 'derived-record/1';
 export const CONTENT_HASH = /^[a-f0-9]{64}$/;
 
-export const DERIVED_TRANSFORMATION_TYPES = [
+export const CALLER_SUPPLIED_TRANSFORMATION_TYPES = [
   'human-note',
   'reflection',
   'summary',
@@ -19,6 +19,11 @@ export const DERIVED_TRANSFORMATION_TYPES = [
   'decision',
   'activity-candidate',
   'revision',
+] as const satisfies readonly DerivedTransformationType[];
+
+export const DERIVED_TRANSFORMATION_TYPES = [
+  ...CALLER_SUPPLIED_TRANSFORMATION_TYPES,
+  'candidate-observation',
 ] as const satisfies readonly DerivedTransformationType[];
 
 export const DERIVED_REVIEW_STATES = [
@@ -57,6 +62,14 @@ export const validateDerivedDraft = (input: {
     )
   ) {
     errors.push(`unknown-transformation-type:${input.transformationType}`);
+  } else if (
+    !(CALLER_SUPPLIED_TRANSFORMATION_TYPES as readonly string[]).includes(
+      input.transformationType,
+    )
+  ) {
+    errors.push(
+      `machine-type-not-caller-supplied:${input.transformationType}`,
+    );
   }
   if (!input.createdBy.name.trim()) {
     errors.push('producer-name-missing');

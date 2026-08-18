@@ -139,4 +139,20 @@ describe('DerivedRecordService', () => {
     expect(result.status).toBe('invalid');
     expect(result.error).toContain('agent-model-missing');
   });
+
+  it('rejects candidate-observation; that type is interpret-source only', async () => {
+    const result = await service.record({
+      ...baseInput(outputDir),
+      transformationType: 'candidate-observation',
+      createdBy: {
+        type: 'agent',
+        name: 'chronicle-interpret',
+        model: 'synthetic-model',
+      },
+    });
+    expect(result.status).toBe('invalid');
+    expect(result.error).toContain(
+      'machine-type-not-caller-supplied:candidate-observation',
+    );
+  });
 });

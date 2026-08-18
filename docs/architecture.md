@@ -87,6 +87,17 @@ Failures describe the requested subgraph only.
 `transformation-provenance` stays the narrow compatibility helper. See
 `docs/design/provenance-graph.md`.
 
+Machine interpretation (PRD-0027 E4a) is a sixth handler:
+`InterpretHandler` → `InterpretationService` → the existing definition,
+execution, and derived stores plus `SourceContentRepository`,
+`ModelInvocationRepository`, and `ExecutionOccurrenceStore`. It
+resolves private source ephemerally, invokes a model, and publishes
+`candidate-observation` derived records **only after** the
+corresponding execution is durable. Occurrences are operational
+receipts, not provenance-graph nodes. Direct human `record-derived`
+lineage (`source → derived`) is unchanged. See
+`docs/design/interpretation-policy.md`.
+
 ### Dependency direction
 
 ```
@@ -114,6 +125,8 @@ Defined in `src/types.ts`:
 - **DerivedRecord** — an immutable interpretation *event* citing a source graph (not Activity).
 - **TransformationDefinition** — persisted immutable recipe (type, version, description, flags).
 - **TransformationExecution** — one run of a named recipe; cites `definitionId`.
+- **InterpretationPolicy** — optional recipe fields hashed into definition identity.
+- **ExecutionOccurrence** — one physical provider invocation (not a graph node).
 - **Provenance graph** — in-memory walk over those artifacts (nodes + cites/produces/contains edges).
 
 These types are the contract between the source repositories, the synthesis service, and downstream

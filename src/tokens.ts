@@ -15,6 +15,7 @@ export const CHRONICLE_TOKENS = {
   DerivedRecordHandler: Symbol.for('DerivedRecordHandler'),
   TransformationHandler: Symbol.for('TransformationHandler'),
   ProvenanceHandler: Symbol.for('ProvenanceHandler'),
+  InterpretHandler: Symbol.for('InterpretHandler'),
 
   // Services
   ChronicleService: Symbol.for('ChronicleService'),
@@ -23,6 +24,7 @@ export const CHRONICLE_TOKENS = {
   DerivedRecordService: Symbol.for('DerivedRecordService'),
   TransformationService: Symbol.for('TransformationService'),
   ProvenanceService: Symbol.for('ProvenanceService'),
+  InterpretationService: Symbol.for('InterpretationService'),
 
   // Repositories (one per source)
   GitRepository: Symbol.for('GitRepository'),
@@ -44,4 +46,7 @@ export const CHRONICLE_TOKENS = {
   TransformationRegistry: Symbol.for('TransformationRegistry'),
   TransformationDefinitionStore: Symbol.for('TransformationDefinitionStore'),
   TransformationExecutionStore: Symbol.for('TransformationExecutionStore'),
+  ExecutionOccurrenceStore: Symbol.for('ExecutionOccurrenceStore'),
+  SourceContentRepository: Symbol.for('SourceContentRepository'),
+  ModelInvocationRepository: Symbol.for('ModelInvocationRepository'),
 } as const;

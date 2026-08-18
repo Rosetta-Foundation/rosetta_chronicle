@@ -94,6 +94,20 @@ describe('derived-record.utils', () => {
     expect(a.content).toBe(CONTENT);
   });
 
+  it('rejects machine types from the caller-supplied draft path', () => {
+    expect(
+      validateDerivedDraft({
+        sourceGraphHash: HASH,
+        nodeIds: ['n1'],
+        transformationType: 'candidate-observation',
+        createdBy: { type: 'agent', name: 'chronicle-interpret', model: 'x' },
+        content: CONTENT,
+      }),
+    ).toContain(
+      'machine-type-not-caller-supplied:candidate-observation',
+    );
+  });
+
   it('flags missing conversation and node ids on a loaded graph', () => {
     expect(
       validateSourceRefsOnGraph(graph(), {

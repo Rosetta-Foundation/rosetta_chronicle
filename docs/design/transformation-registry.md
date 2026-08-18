@@ -55,7 +55,9 @@ not part of the derived id. The same human note recorded without an
 execution keeps the same derived id.
 
 `record-derived` still persists a derived record only.
-`transform-record` runs a named transformation and writes both records.
+`transform-record` runs a named **caller-supplied** transformation and
+writes both records. `interpret-source` runs `candidate-observation`
+and writes definition → execution → derived → occurrence.
 
 ## 1. What is a Transformation?
 
@@ -75,10 +77,11 @@ registry. It is not the output and not a single run.
 | configuration | Opaque JSON object on the execution (empty `{}` by default) |
 
 This phase registers the existing derived types at recipe version `1`,
-all **deterministic**, because content is still caller-supplied. A later
-nondeterministic AI recipe (model + prompt + sampling) is the same
-shape with `deterministic: false`. It is not registered here and does
-not generate content.
+all **deterministic**, because content is still caller-supplied.
+`candidate-observation@1` is the E4a nondeterministic agent recipe
+(`deterministic: false`, `allowedProducerTypes: ['agent']`) with an
+`InterpretationPolicy` on the definition. `llm-reflection` is still
+unregistered. See `docs/design/interpretation-policy.md`.
 
 ## 2. Transformation identity
 
@@ -87,12 +90,14 @@ Bootstrap identity is `(type, version)` in the in-memory registry.
 Definition identity is the SHA-256 of:
 
 ```text
-{ type, version, description, deterministic, allowedProducerTypes }
+{ type, version, description, deterministic, allowedProducerTypes
+  [, policy] }
 ```
 
 `createdAt` is not in the definition id. The same recipe fields are the
 same artifact (`already-present`; first `createdAt` kept). Changing
-description or flags is a new id, even if type@version is unchanged.
+description, flags, or policy is a new id, even if type@version is
+unchanged. Recipes without `policy` keep the previous hash.
 
 Execution identity is the SHA-256 of:
 
@@ -108,8 +113,11 @@ producer, refs, recipe version, or configuration is a new execution.
 
 Human example: `human-note` / `1` / producer name / empty config.
 Agent example (content still supplied): same recipe, `producer.type:
-agent` plus `model` (and optional `promptVersion`). An `llm-reflection`
-recipe is future work — this phase does not invent or run one.
+agent` plus `model` (and optional `promptVersion`).
+`candidate-observation` is run by `interpret-source`, not
+`transform-record`; producer is `chronicle-interpret` plus `model`,
+without `promptVersion`. An `llm-reflection` recipe is still future
+work.
 
 ## 3. TransformationExecution
 
@@ -121,6 +129,7 @@ interface TransformationDefinition {
   description: string;
   deterministic: boolean;
   allowedProducerTypes: DerivedProducerType[];
+  policy?: InterpretationPolicy; // hashed into id when present
   createdAt: string;
   contentHash: string;
 }
@@ -213,7 +222,8 @@ chronicle transformation-provenance --compare <id> --with <id> \
 
 `--source-ref` is an alias for `--source-graph-hash`. Does not emit
 Activity, does not write a Daily Chronicle, does not promote, does not
-summarize.
+summarize. Machine interpretation is `chronicle interpret-source`
+(`docs/design/interpretation-policy.md`).
 
 ## Out of scope
 
@@ -221,9 +231,10 @@ summarize.
 - Embeddings, semantic search, vector stores, agent memory
 - `ActivitySource` membership / Daily Chronicle synthesis
 - Organizational promotion
-- Nondeterministic registered AI recipes
+- Caller-supplied `candidate-observation` (`transform-record` rejects it)
+- Vendor model SDKs
 
-## Review answers (this increment)
+## Review answers (registry increment)
 
 1. **Definition identity is separate from execution identity.** The
    definition id hashes recipe fields. The execution id hashes
@@ -234,8 +245,9 @@ summarize.
    today's in-memory catalog row.
 3. **The source → interpretation → memory boundary holds.** No
    Activity, Daily Chronicle, or promotion.
-4. **No premature AI machinery.** Recipes remain caller-supplied and
-   deterministic.
+4. **Caller-supplied recipes remain deterministic.** The E4a
+   `candidate-observation` recipe is the registered nondeterministic
+   exception; it is not run through `transform-record`.
 
 ## Future considerations
 

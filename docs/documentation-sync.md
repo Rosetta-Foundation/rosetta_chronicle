@@ -119,6 +119,8 @@ Implemented:
 - persisted transformation definition artifacts (recipe identity)
 - transformation-provenance compatibility helper (single-hop execution walk)
 - first-class provenance graph traversal (backward and forward; partial integrity)
+- machine interpretation of explicitly cited ChatGPT nodes
+  (`candidate-observation` / `interpret-source`; not Activity)
 
 Not implemented:
 
@@ -126,9 +128,10 @@ Not implemented:
 - Daily Chronicle synthesis from ChatGPT
 - organizational promotion
 - automatic summarization or reflection extraction
-- AI-generated transformations with model/prompt identity
 - raw attachment persistence
 - generalized personal activity modeling
+- live vendor model SDK in this engine
+- bulk conversation scan / E4b private Specimen A
 
 ---
 
@@ -182,7 +185,7 @@ Include:
 - read-only versus mutating behavior
 - failure behavior
 
-Keep inventory and import separate.
+Keep inventory, import, and interpret-source separate.
 
 ---
 
@@ -238,6 +241,8 @@ transformation registry / execution provenance
 persisted transformation definitions
 ↓
 provenance graph traversal
+↓
+machine interpretation (candidate-observation)
 
 The detailed path belongs in Chronicle records.
 

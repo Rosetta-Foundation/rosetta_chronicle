@@ -14,6 +14,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
   writeFileSync,
@@ -23,14 +24,12 @@ import { join } from 'path';
 
 const CLI = join(__dirname, '../../dist/bin/cli.js');
 
-// Ensure the CLI is built before running.
+// Rebuild so CLI tests see the current source, not a stale dist.
 beforeAll(() => {
-  if (!existsSync(CLI)) {
-    execFileSync('yarn', ['build'], {
-      cwd: join(__dirname, '../..'),
-      stdio: ['pipe', 'pipe', 'pipe'],
-    });
-  }
+  execFileSync('bun', ['run', 'build'], {
+    cwd: join(__dirname, '../..'),
+    stdio: ['pipe', 'pipe', 'pipe'],
+  });
 });
 
 describe('chronicle CLI', () => {
@@ -47,6 +46,7 @@ describe('chronicle CLI', () => {
     expect(result.stdout).toContain('transform-record');
     expect(result.stdout).toContain('transformation-provenance');
     expect(result.stdout).toContain('provenance');
+    expect(result.stdout).toContain('interpret-source');
   });
 
   it('inventory-chatgpt exits 1 without --export', () => {
@@ -319,6 +319,99 @@ describe('chronicle CLI', () => {
     );
     expect(result.status).toBe(1);
     expect(result.stderr).toContain('--definitions');
+  });
+
+  it('interpret-source exits 1 without --export', () => {
+    const result = spawnSync(process.execPath, [CLI, 'interpret-source'], {
+      encoding: 'utf-8',
+    });
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('--export');
+  });
+
+  it('interpret-source rejects --review-state and --content', () => {
+    const reviewed = spawnSync(
+      process.execPath,
+      [CLI, 'interpret-source', '--review-state', 'recognized'],
+      { encoding: 'utf-8' },
+    );
+    expect(reviewed.status).toBe(1);
+    expect(reviewed.stderr).toContain('unreviewed');
+    const contented = spawnSync(
+      process.execPath,
+      [CLI, 'interpret-source', '--content', 'nope'],
+      { encoding: 'utf-8' },
+    );
+    expect(contented.status).toBe(1);
+    expect(contented.stderr).toContain('--content');
+  });
+
+  it('interpret-source --dry-run writes nothing and omits source text', () => {
+    const graphs = mkdtempSync(join(tmpdir(), 'cli-e4-graphs-'));
+    const derived = mkdtempSync(join(tmpdir(), 'cli-e4-derived-'));
+    const execs = mkdtempSync(join(tmpdir(), 'cli-e4-exec-'));
+    const defs = mkdtempSync(join(tmpdir(), 'cli-e4-def-'));
+    const occs = mkdtempSync(join(tmpdir(), 'cli-e4-occ-'));
+    const fixture = join(
+      __dirname,
+      'fixtures/chatgpt-export/complete-export',
+    );
+    try {
+      const imported = spawnSync(
+        process.execPath,
+        [CLI, 'import-chatgpt', '--export', fixture, '--output', graphs],
+        { encoding: 'utf-8' },
+      );
+      expect(imported.status).toBe(0);
+      const graph = JSON.parse(imported.stdout);
+      const result = spawnSync(
+        process.execPath,
+        [
+          CLI,
+          'interpret-source',
+          '--type',
+          'candidate-observation',
+          '--export',
+          fixture,
+          '--graph',
+          graph.path,
+          '--source-graph-hash',
+          graph.contentHash,
+          '--conversation-id',
+          'conv-linear',
+          '--node-id',
+          'node-linear-1',
+          '--output',
+          derived,
+          '--executions',
+          execs,
+          '--definitions',
+          defs,
+          '--occurrences',
+          occs,
+          '--provider',
+          'fixture',
+          '--model',
+          'synthetic-model',
+          '--dry-run',
+        ],
+        { encoding: 'utf-8' },
+      );
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('"status": "dry-run"');
+      expect(result.stdout).not.toContain('REDACTED_SHOULD_NOT_LEAK');
+      expect(result.stdout).not.toContain('SYNTHETIC_TITLE_MUST_NOT_LEAK');
+      expect(readdirSync(derived)).toEqual([]);
+      expect(readdirSync(execs)).toEqual([]);
+      expect(readdirSync(defs)).toEqual([]);
+      expect(readdirSync(occs)).toEqual([]);
+    } finally {
+      rmSync(graphs, { recursive: true, force: true });
+      rmSync(derived, { recursive: true, force: true });
+      rmSync(execs, { recursive: true, force: true });
+      rmSync(defs, { recursive: true, force: true });
+      rmSync(occs, { recursive: true, force: true });
+    }
   });
 
   it('exits 1 with unknown command', () => {

@@ -295,4 +295,17 @@ describe('TransformationService', () => {
     expect(result.error).toContain('unknown-transformation:human-note@9');
     expect(existsSync(join(outputDir, 'chronicles'))).toBe(false);
   });
+
+  it('rejects candidate-observation; that type is interpret-source only', async () => {
+    const result = await service.transform({
+      ...baseInput(outputDir, executionsDir, definitionsDir),
+      transformationType: 'candidate-observation',
+      createdBy: { type: 'agent', name: 'chronicle-interpret', model: 'x' },
+    });
+    expect(result.status).toBe('invalid');
+    expect(result.error).toContain(
+      'machine-type-not-caller-supplied:candidate-observation',
+    );
+    expect(existsSync(join(outputDir, 'chronicles'))).toBe(false);
+  });
 });

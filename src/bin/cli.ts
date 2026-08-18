@@ -7,6 +7,7 @@ import {
   getDerivedRecordHandler,
   getTransformationHandler,
   getProvenanceHandler,
+  getInterpretHandler,
   buildContainer,
 } from '../index';
 import {
@@ -43,6 +44,7 @@ import { CHRONICLE_TOKENS } from '../tokens';
  *   chronicle transformation-provenance
  *                                 Walk or compare transformation executions.
  *   chronicle provenance          First-class backward/forward graph walk.
+ *   chronicle interpret-source    Machine interpretation with provenance (E4).
  *
  * Daily Chronicle commands write to the personal Chronicle repo
  * (CHRONICLE_REPO env var or --repo flag) and are idempotent by content hash.
@@ -63,6 +65,7 @@ Usage:
   chronicle transformation-provenance --source-graph-hash <hex> --executions <dir>
   chronicle transformation-provenance --compare <id> --with <id> --executions <dir>
   chronicle provenance --from <kind>:<id> --direction backward|forward --graphs <dir> --output <dir> --executions <dir> --definitions <dir>
+  chronicle interpret-source --type candidate-observation --export <path> --graph <file> --source-graph-hash <hex> --conversation-id <id> --node-id <id> --output <dir> --executions <dir> --definitions <dir> --occurrences <dir> --provider <name> --model <id> [--dry-run]
   chronicle queue [show] [--repo <path>]
   chronicle queue add "<title>" [--jira KEY] [--prd NNNN/N] [--due DATE] [--repo <path>]
   chronicle queue done "<title-or-id>" [--repo <path>]
@@ -96,6 +99,12 @@ Commands:
   provenance          First-class backward/forward provenance graph walk
                       over source, definition, execution, and derived
                       records. Does not emit Activity.
+  interpret-source    Machine interpretation of explicitly cited source
+                      nodes under the candidate-observation policy.
+                      Resolves private source ephemerally. Does not emit
+                      Activity. Output begins unreviewed. Default stdout
+                      omits source text and observation statements.
+                      --dry-run validates only (no provider, no writes).
 
 Options:
   --repo <path>       Absolute path to your personal Chronicle repo.
@@ -108,7 +117,9 @@ Options:
                       meetings from. Falls back to $CHRONICLE_CALENDAR.
   --start <date>      Start date (YYYY-MM-DD). Required for backfill.
   --end <date>        End date (YYYY-MM-DD). Defaults to today.
-  --dry-run           Print the generated Markdown without persisting.
+  --dry-run           Print Daily Chronicle Markdown without persisting.
+                      For interpret-source: validate only (no provider,
+                      no writes).
   --force             Persist even if it would drop activity a prior run captured
                       (bypasses the clobber guard). Use for intentional shrinks.
   --session-id <id>   Session UUID to append (append-session only).
@@ -117,7 +128,7 @@ Options:
   --due <YYYY-MM-DD>  Attach a due-date signal to a new queue item.
   --state <state>     Filter queue list by state (active|next|inbox|done).
   --export <path>     ChatGPT export directory or .zip
-                      (inventory-chatgpt, import-chatgpt).
+                      (inventory-chatgpt, import-chatgpt, interpret-source).
   --output <dir>      Directory for import-chatgpt, record-derived, or
                       transform-record derived JSON. Caller-chosen; the
                       engine does not assume a personal Chronicle layout.
@@ -127,6 +138,8 @@ Options:
                       Falls back to $CHRONICLE_EXECUTION_DIR.
   --definitions <dir> Directory for persisted transformation definitions.
                       Falls back to $CHRONICLE_DEFINITION_DIR.
+  --occurrences <dir> Directory for execution-occurrence JSON.
+                      Falls back to $CHRONICLE_OCCURRENCE_DIR.
   --graphs <dir>      Directory of source-graph JSON files.
                       Falls back to $CHRONICLE_SOURCE_GRAPH_DIR.
   --from <kind>:<id>  Start of chronicle provenance (derived-record,
@@ -148,7 +161,10 @@ Options:
   --node-id <id>      Optional source-graph node id (repeatable).
   --type <kind>       Derived transformation type (human-note, reflection,
                       summary, insight, decision, activity-candidate,
-                      revision).
+                      revision, candidate-observation).
+  --provider <name>   Model provider identity for interpret-source
+                      (execution configuration, not a secret).
+  --temperature <n>   Optional sampling temperature for interpret-source.
   --producer-type <human|agent>
                       Who created the derived content.
   --producer-name <name>
@@ -159,7 +175,9 @@ Options:
   --content <text>    Human-created derived body (synthetic in tests).
   --content-file <path>
                       Read derived body from a file instead of --content.
-  --graph <path>      Optional source-graph JSON to validate refs against.
+  --graph <path>      Source-graph JSON. Optional ref check for
+                      record-derived / transform-record; required for
+                      interpret-source.
   --confidence <n>    Optional 0..1 confidence.
   --review-state <state>
                       unreviewed | recognized | rejected | corrected |
@@ -181,7 +199,13 @@ Environment variables:
                       transformation-provenance, and provenance.
   CHRONICLE_DEFINITION_DIR
                       Default --definitions for transform-record,
-                      transformation-provenance, and provenance.
+                      transformation-provenance, provenance, and
+                      interpret-source.
+  CHRONICLE_OCCURRENCE_DIR
+                      Default --occurrences for interpret-source.
+  CHRONICLE_INTERPRET_MODEL_FIXTURE
+                      Optional local JSON/text file used as the model
+                      body. No vendor SDK is bundled in E4a.
 `.trim();
 
 interface ParsedArgs {
@@ -229,6 +253,9 @@ interface ParsedArgs {
   graphsDir?: string;
   fromRef?: string;
   direction?: string;
+  occurrencesDir?: string;
+  provider?: string;
+  temperature?: number;
 }
 
 function parseArgs(argv: string[]): ParsedArgs {
@@ -327,6 +354,9 @@ function parseArgs(argv: string[]): ParsedArgs {
       case '--definitions':
         result.definitionsDir = args[++i];
         break;
+      case '--occurrences':
+        result.occurrencesDir = args[++i];
+        break;
       case '--graphs':
         result.graphsDir = args[++i];
         break;
@@ -374,6 +404,12 @@ function parseArgs(argv: string[]): ParsedArgs {
         break;
       case '--model':
         result.model = args[++i];
+        break;
+      case '--provider':
+        result.provider = args[++i];
+        break;
+      case '--temperature':
+        result.temperature = Number(args[++i]);
         break;
       case '--prompt-version':
         result.promptVersion = args[++i];
@@ -964,6 +1000,91 @@ async function runProvenance(args: ParsedArgs): Promise<void> {
   }
 }
 
+async function runInterpretSource(args: ParsedArgs): Promise<void> {
+  if (args.reviewState) {
+    die('interpret-source does not accept --review-state; output is unreviewed');
+  }
+  if (args.content != null || args.contentFile) {
+    die('interpret-source does not accept --content; the model produces output');
+  }
+  const type = args.transformationType ?? 'candidate-observation';
+  if (type !== 'candidate-observation') {
+    die('interpret-source requires --type candidate-observation');
+  }
+  if (!args.exportPath) die('--export <path> is required for interpret-source');
+  if (!args.graphPath) die('--graph <path> is required for interpret-source');
+  if (!args.sourceGraphHash) {
+    die('--source-graph-hash is required for interpret-source');
+  }
+  if (!args.conversationId) {
+    die('--conversation-id is required for interpret-source');
+  }
+  if (args.nodeIds.length === 0) {
+    die('--node-id is required for interpret-source (repeatable)');
+  }
+  const outputDir = args.outputDir ?? process.env['CHRONICLE_DERIVED_DIR'];
+  if (!outputDir) {
+    die(
+      '--output <dir> (or $CHRONICLE_DERIVED_DIR) is required for interpret-source',
+    );
+  }
+  const executionsDir =
+    args.executionsDir ?? process.env['CHRONICLE_EXECUTION_DIR'];
+  if (!executionsDir) {
+    die(
+      '--executions <dir> (or $CHRONICLE_EXECUTION_DIR) is required for interpret-source',
+    );
+  }
+  const definitionsDir =
+    args.definitionsDir ?? process.env['CHRONICLE_DEFINITION_DIR'];
+  if (!definitionsDir) {
+    die(
+      '--definitions <dir> (or $CHRONICLE_DEFINITION_DIR) is required for interpret-source',
+    );
+  }
+  const occurrencesDir =
+    args.occurrencesDir ?? process.env['CHRONICLE_OCCURRENCE_DIR'];
+  if (!occurrencesDir) {
+    die(
+      '--occurrences <dir> (or $CHRONICLE_OCCURRENCE_DIR) is required for interpret-source',
+    );
+  }
+  if (!args.provider) die('--provider is required for interpret-source');
+  if (!args.model) die('--model is required for interpret-source');
+  if (
+    args.temperature != null &&
+    (Number.isNaN(args.temperature) ||
+      args.temperature < 0 ||
+      args.temperature > 2)
+  ) {
+    die('--temperature must be a number between 0 and 2');
+  }
+  const handler = getInterpretHandler();
+  const result = await handler.handle({
+    exportPath: args.exportPath,
+    graphPath: args.graphPath,
+    sourceGraphHash: args.sourceGraphHash,
+    conversationId: args.conversationId,
+    nodeIds: args.nodeIds,
+    outputDir,
+    executionsDir,
+    definitionsDir,
+    occurrencesDir,
+    provider: args.provider,
+    model: args.model,
+    ...(args.temperature != null ? { temperature: args.temperature } : {}),
+    dryRun: args.dryRun,
+  });
+  console.log(JSON.stringify(result, null, 2));
+  if (
+    result.status !== 'recorded' &&
+    result.status !== 'already-present' &&
+    result.status !== 'dry-run'
+  ) {
+    process.exit(1);
+  }
+}
+
 async function main(): Promise<void> {
   const args = parseArgs(process.argv);
 
@@ -994,6 +1115,9 @@ async function main(): Promise<void> {
       break;
     case 'provenance':
       await runProvenance(args);
+      break;
+    case 'interpret-source':
+      await runInterpretSource(args);
       break;
     default:
       console.error(`chronicle: unknown command '${args.command}'\n`);

@@ -29,6 +29,22 @@ A source graph *contains* conversations and nodes. Direct
 `record-derived` notes are legitimate lineage even when no
 `TransformationExecution` exists.
 
+Machine interpretation uses a different shape:
+
+```text
+SourceGraph ← cites ─ TransformationExecution ─ produces → DerivedRecord
+```
+
+Those two shapes must not be collapsed. The walker still lists every
+durable derived file, so a machine `DerivedRecord` published without
+its execution would look like a direct human note on a forward walk.
+E4a therefore publishes the execution **before** the derived record.
+See `docs/design/interpretation-policy.md`.
+
+Occurrences (`ExecutionOccurrence`) are operational receipts of a
+provider invoke. They are **not** provenance-graph nodes and are not
+included in the default `chronicle provenance` walk.
+
 ### Nodes
 
 Handles only. Domain bodies stay in their stores.
@@ -103,6 +119,11 @@ definition, execution, derived record, graph, conversation, or node is
 `execution-missing`, `derived-missing`, `source-graph-missing`,
 `conversation-missing`, or `node-missing`.
 
+`partial` is this walker's integrity status. Machine interpretation
+does not add a new engine-wide status; a crash that leaves an
+execution without its derived outputs is visible here as
+`derived-missing` on the requested subgraph.
+
 Failures describe the **requested subgraph**. A missing or invalid
 source graph, definition, execution, or derived record that is not
 reachable from `--from` does not change status. Stores are still
@@ -166,9 +187,11 @@ Report only structural facts (status, node/edge counts, failure codes).
 
 ## Out of scope
 
-- AI generation, embeddings, Activity, Daily Chronicle, promotion
+- Embeddings, Activity, Daily Chronicle, promotion
 - Graph databases or a query language
 - Expanding `transformation-provenance` into this API
+- Adding occurrences as graph nodes
+- Redesigning `partial` as an E4 persistence status
 
 ## Future work
 

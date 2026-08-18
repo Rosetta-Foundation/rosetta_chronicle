@@ -110,4 +110,40 @@ describe('transformation.utils', () => {
       validateTransformationDefinition({ ...a, contentHash: 'd'.repeat(64) }),
     ).toContain('definition-hash-mismatch');
   });
+
+  it('changes definition identity when the interpretation policy changes', () => {
+    const policy = {
+      id: 'candidate-observation-policy',
+      version: '1',
+      maxObservations: 3,
+      epistemicClasses: ['directly-supported', 'inferred'],
+      outputSchemaId: 'candidate-observation/1',
+      promptTemplateId: 'candidate-observation/1',
+      promptTemplateHash: 'e'.repeat(64),
+    };
+    const withPolicy = buildTransformationDefinition(
+      {
+        type: 'candidate-observation',
+        version: '1',
+        description: 'Machine-produced candidate observations.',
+        deterministic: false,
+        allowedProducerTypes: ['agent'],
+        policy,
+      },
+      '2026-08-17T21:00:00.000Z',
+    );
+    const changed = buildTransformationDefinition(
+      {
+        type: 'candidate-observation',
+        version: '1',
+        description: 'Machine-produced candidate observations.',
+        deterministic: false,
+        allowedProducerTypes: ['agent'],
+        policy: { ...policy, version: '2' },
+      },
+      '2026-08-17T21:00:00.000Z',
+    );
+    expect(withPolicy.policy?.version).toBe('1');
+    expect(changed.id).not.toBe(withPolicy.id);
+  });
 });

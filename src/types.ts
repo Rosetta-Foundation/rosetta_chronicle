@@ -435,8 +435,8 @@ export interface ChatGptImportResult {
 // ─── Derived records (PRD-0027 transformation layer) ─────────────────────────
 
 /**
- * Kind of transformation. This phase persists the record; it does not
- * auto-generate summaries or reflections.
+ * Kind of transformation. Caller-supplied kinds persist caller content.
+ * `candidate-observation` is produced only by interpret-source.
  */
 export type DerivedTransformationType =
   | 'human-note'
@@ -445,7 +445,8 @@ export type DerivedTransformationType =
   | 'insight'
   | 'decision'
   | 'activity-candidate'
-  | 'revision';
+  | 'revision'
+  | 'candidate-observation';
 
 /** Evaluation seed on a derived record. Full evaluation history is later. */
 export type DerivedReviewState =
@@ -538,6 +539,21 @@ export interface DerivedRecordResult {
 // ─── Transformation registry / execution (PRD-0027) ──────────────────────────
 
 /**
+ * Epistemic specialization of a recipe. Optional on caller-supplied
+ * recipes. When present it is hashed into definition identity.
+ * Owns what claims are allowed, not how the model is sampled.
+ */
+export interface InterpretationPolicy {
+  id: string;
+  version: string;
+  maxObservations: number;
+  epistemicClasses: string[];
+  outputSchemaId: string;
+  promptTemplateId: string;
+  promptTemplateHash: string;
+}
+
+/**
  * In-memory bootstrap recipe. Not a run and not an output.
  * Recipe `version` is independent of `DerivedRecord.transformationVersion`.
  */
@@ -547,6 +563,7 @@ export interface TransformationRecipe {
   description: string;
   deterministic: boolean;
   allowedProducerTypes: DerivedProducerType[];
+  policy?: InterpretationPolicy;
 }
 
 /**
@@ -617,6 +634,161 @@ export interface TransformRecordResult {
   createdAt?: string;
   error?: string;
 }
+
+// ─── Candidate observation (E4 machine interpretation) ───────────────────────
+
+/**
+ * One durable observation body. Never an array of observations.
+ * `directly-supported` is a machine classification of support, not source.
+ */
+export type CandidateObservationPayload =
+  | {
+      schemaVersion: 'candidate-observation/1';
+      result: 'observation';
+      statement: string;
+      epistemicClass: 'directly-supported' | 'inferred';
+      citedNodeIds: string[];
+      supportNote?: string;
+    }
+  | {
+      schemaVersion: 'candidate-observation/1';
+      result: 'insufficient-evidence';
+      citedNodeIds: string[];
+      supportNote?: string;
+    };
+
+/** What happened to the physical provider call. */
+export type ProviderStatus = 'succeeded' | 'failed' | 'uncertain';
+
+/** Epistemic result. Set only when the provider produced a schema-valid body. */
+export type ExecutionOccurrenceOutcome =
+  | 'observations'
+  | 'insufficient-evidence';
+
+export type ProviderFailureClass =
+  | 'unavailable'
+  | 'timeout'
+  | 'refused'
+  | 'invalid-output';
+
+export type PersistenceStatus = 'committed' | 'not-committed';
+
+/**
+ * One physical provider invocation, written once at a terminal state.
+ * Not a belief — TransformationExecution + DerivedRecord are the
+ * epistemic artifacts. Persistence is a second axis: the provider can
+ * succeed while Chronicle has not yet accepted the output as memory.
+ */
+export interface ExecutionOccurrence {
+  id: string;
+  definitionId: string;
+  sourceRefs: DerivedSourceRef[];
+  producer: DerivedProducer;
+  configuration: Record<string, unknown>;
+  startedAt: string;
+  endedAt: string;
+  nonce: string;
+  providerStatus: ProviderStatus;
+  outcome?: ExecutionOccurrenceOutcome;
+  providerFailureClass?: ProviderFailureClass;
+  persistenceStatus: PersistenceStatus;
+  persistenceFailureClass?: 'persist-failed';
+  executionId?: string;
+  derivedIds?: string[];
+  providerRequestId?: string;
+  /** Concrete model/version the provider reported for this invoke. */
+  modelVersion?: string;
+}
+
+/** Input to machine interpretation. Content is never caller-supplied. */
+export interface InterpretSourceInput {
+  exportPath: string;
+  graphPath: string;
+  sourceGraphHash: string;
+  conversationId: string;
+  nodeIds: string[];
+  outputDir: string;
+  executionsDir: string;
+  definitionsDir: string;
+  occurrencesDir: string;
+  provider: string;
+  model: string;
+  temperature?: number;
+  dryRun?: boolean;
+  createdAt?: string;
+  startedAt?: string;
+  endedAt?: string;
+  nonce?: string;
+}
+
+export type InterpretSourceStatus =
+  | 'dry-run'
+  | 'recorded'
+  | 'already-present'
+  | 'invalid'
+  | 'unavailable'
+  | 'uncertain'
+  | 'refused'
+  | 'invalid-output'
+  | 'persist-failed'
+  | 'occurrence-persist-failed';
+
+/**
+ * Result of interpret-source. Never includes source text or observation
+ * statements — those paraphrase private material.
+ */
+export interface InterpretSourceResult {
+  status: InterpretSourceStatus;
+  definitionId?: string;
+  executionId?: string;
+  derivedIds?: string[];
+  occurrenceId?: string;
+  observationCount?: number;
+  epistemicClasses?: string[];
+  reviewState?: DerivedReviewState;
+  providerStatus?: ProviderStatus;
+  persistenceStatus?: PersistenceStatus;
+  outcome?: ExecutionOccurrenceOutcome;
+  providerFailureClass?: ProviderFailureClass;
+  resolvedNodeCount?: number;
+  error?: string;
+}
+
+/** In-memory resolved source node. Never persisted. */
+export interface ResolvedSourceNode {
+  nodeId: string;
+  role?: string;
+  contentType?: string;
+  text: string;
+  attachments: Array<{
+    id?: string;
+    presentInArchive: boolean;
+    mimeType?: string;
+  }>;
+}
+
+export type SourceResolveResult =
+  | { ok: true; contentHash: string; nodes: ResolvedSourceNode[] }
+  | { ok: false; error: string };
+
+export interface ModelInvokeRequest {
+  provider: string;
+  model: string;
+  prompt: string;
+  temperature?: number;
+}
+
+export type ModelInvokeResult =
+  | {
+      ok: true;
+      text: string;
+      modelVersion?: string;
+      providerRequestId?: string;
+    }
+  | {
+      ok: false;
+      failureClass: ProviderFailureClass;
+    };
 
 /**
  * Provenance query. Exactly one of derived / execution / source /

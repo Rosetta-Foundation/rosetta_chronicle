@@ -3,7 +3,11 @@ import {
   DerivedTransformationType,
   TransformationRecipe,
 } from '../types';
-import { DERIVED_TRANSFORMATION_TYPES } from '../utils/derived-record.utils';
+import { CALLER_SUPPLIED_TRANSFORMATION_TYPES } from '../utils/derived-record.utils';
+import {
+  CANDIDATE_OBSERVATION_POLICY,
+  CANDIDATE_OBSERVATION_TYPE,
+} from '../utils/interpretation-policy.utils';
 import { TRANSFORMATION_RECIPE_VERSION } from '../utils/transformation.utils';
 
 /**
@@ -18,7 +22,10 @@ export interface ITransformationRegistry {
   list(): TransformationRecipe[];
 }
 
-const RECIPE_DESCRIPTION: Record<DerivedTransformationType, string> = {
+const RECIPE_DESCRIPTION: Record<
+  (typeof CALLER_SUPPLIED_TRANSFORMATION_TYPES)[number],
+  string
+> = {
   'human-note':
     'Caller-supplied note citing source-graph structure.',
   reflection:
@@ -33,21 +40,32 @@ const RECIPE_DESCRIPTION: Record<DerivedTransformationType, string> = {
     'Caller-supplied revision citing source-graph structure.',
 };
 
-const recipes = (): TransformationRecipe[] =>
-  DERIVED_TRANSFORMATION_TYPES.map((type) => ({
-    type,
+const candidateObservationRecipe = (): TransformationRecipe => ({
+  type: CANDIDATE_OBSERVATION_TYPE,
+  version: TRANSFORMATION_RECIPE_VERSION,
+  description:
+    'Machine-produced candidate observations from explicitly cited source nodes. Distinguishes directly-supported from inferred. Directly-supported remains a machine classification, not source truth. May return insufficient-evidence. Nondeterministic. Agent only.',
+  deterministic: false,
+  allowedProducerTypes: ['agent'],
+  policy: CANDIDATE_OBSERVATION_POLICY,
+});
+
+const recipes = (): TransformationRecipe[] => [
+  ...CALLER_SUPPLIED_TRANSFORMATION_TYPES.map((type) => ({
+    type: type as DerivedTransformationType,
     version: TRANSFORMATION_RECIPE_VERSION,
     description: RECIPE_DESCRIPTION[type],
     deterministic: true,
-    allowedProducerTypes: ['human', 'agent'],
-  }));
+    allowedProducerTypes: ['human' as const, 'agent' as const],
+  })),
+  candidateObservationRecipe(),
+];
 
 /**
- * In-memory bootstrap of deterministic, caller-supplied recipes.
+ * In-memory bootstrap of named recipes.
  *
- * Every current derived type is registered at recipe version `1`.
- * Nondeterministic AI recipes are not registered. Persisted
- * definitions are written from these rows at transform time.
+ * Caller-supplied types remain deterministic at version `1`.
+ * `candidate-observation` is the E4 nondeterministic agent recipe.
  */
 @injectable()
 export class TransformationRegistry implements ITransformationRegistry {
@@ -64,4 +82,4 @@ export class TransformationRegistry implements ITransformationRegistry {
   list(): TransformationRecipe[] {
     return [...this._byKey.values()];
   }
-}
+};
