@@ -123,6 +123,11 @@ Implemented:
   (`candidate-observation` / `interpret-source`; not Activity)
 - live xAI Responses HTTP transport for interpret-source
   (`XAI_API_KEY`, `grok-4.6`, `reasoning_effort=high`; no vendor SDK)
+- E4b measured locally (two physical xAI / `grok-4.6` invocations
+  against the private specimen: first transport failure
+  `not-committed`, second committed interpretation; sanitized
+  result in `docs/design/interpretation-policy.md`; private source
+  and observations are not in this repository)
 
 Not implemented:
 
@@ -133,7 +138,9 @@ Not implemented:
 - raw attachment persistence
 - generalized personal activity modeling
 - a second live provider, Cursor agent transport, or a vendored SDK
-- bulk conversation scan / E4b private Specimen A
+- bulk conversation scan
+- durable human evaluation of machine interpretations (E5)
+- general model reliability, multimodal coverage, or biography
 
 ---
 

@@ -255,8 +255,104 @@ expanded prompt, or log credentials or source. A second provider,
 Cursor agent transport, and a vendored SDK are out of scope.
 
 Public tests use the synthetic ChatGPT export fixture and a mocked
-HTTP transport. E4b private Specimen A smoke is a separate local
-experiment, not this repository.
+HTTP transport. E4b private smoke is a local experiment; its source
+and observation text are not in this repository.
+
+## E4b — measured local experiment (2026-08-18)
+
+E4b asked whether one bounded real-model invocation can interpret a
+deliberately selected slice of private source and leave a provenance
+path that distinguishes source, policy, execution, physical
+invocation, and epistemic restraint.
+
+It is an experiment, not a product feature and not a reliability
+claim.
+
+### Sanitized result
+
+| Field | Measured |
+| --- | --- |
+| Engine revision | `27a3008` (#18 merge on #17) |
+| Provider / requested model | xAI / `grok-4.6` |
+| Selected nodes | 4 |
+| Roles | 2 user / 2 assistant |
+| Content types | `text` 3, `multimodal_text` 1 |
+| Attachments | 1 present image, 0 missing |
+| Observations | 3 |
+| Epistemic classes | `directly-supported` 3 |
+| `providerStatus` | `succeeded` |
+| `outcome` | `observations` |
+| `persistenceStatus` | `committed` |
+| `providerRequestId` captured | yes |
+| Provider `modelVersion` captured | yes, `grok-4.6` |
+| Backward provenance | `ok` × 3 |
+| Forward provenance | `ok` × 4 |
+| Structural failures | none |
+| Privacy tripwire | pass |
+| Activity / Daily Chronicle / promotion | none |
+| Human review | all supported as classified |
+| Physical provider invocations | 2 (same private selection) |
+| First invocation | HTTP 410 / `unavailable` / `not-committed` |
+| Second invocation | `succeeded` / `observations` / `committed` |
+
+Additional sanitized behavioral finding: all three observations were
+supported by cited source text. The present image attachment was not
+described or invented. The multimodal node was not cited.
+`supportNote` behaved as machine commentary rather than source. All
+machine observations remained `unreviewed` in Chronicle.
+
+The measured table above is the **second** physical xAI invocation.
+There were two live calls against the same private selection:
+
+1. Transport / provider failure. The adapter sent deprecated
+   `search_parameters`; xAI returned HTTP 410. Chronicle recorded
+   `unavailable` and `not-committed`. No derived records.
+2. After #18 omitted that field, the experiment was run again under
+   the corrected transport contract. That call produced the committed
+   interpretation above.
+
+The second call was **not** a retry of a schema-valid model result.
+Chronicle must not erase an unsuccessful physical invocation merely
+because it produced no epistemic artifact. Attempt history is why
+`ExecutionOccurrence` exists.
+
+### Proven
+
+- Bounded real machine interpretation can be produced
+- Machine interpretation remains distinct from source
+- Exact source lineage survives
+- Transformation policy survives
+- Provider/model invocation identity survives
+- Physical invocation receipt survives
+- An unsuccessful physical invocation can leave a receipt without
+  committing interpretation
+- Machine observations begin `unreviewed`
+- Forward and backward provenance survive
+- Private source does not enter the public engine artifacts tested
+- No Activity / Daily Chronicle / promotion occurs
+- In this experiment, human review found all three classifications
+  supported
+
+### Not proven
+
+- General model reliability
+- Reliability across the corpus
+- Reliable multimodal interpretation
+- Behavior with missing attachments
+- Biography
+- Automatic selection or creation of meaningful personal memory at
+  scale
+- Current understanding
+- Conflict resolution
+- Review / evaluation semantics
+- Promotion
+- Organizational use
+- Wayfinder
+- Background interpretation
+
+Two physical invokes, one of them committed, are not a claim about
+model reliability. The human review act itself is **not** yet a
+Chronicle artifact.
 
 ## Architecture
 
@@ -305,5 +401,6 @@ promote, does not accept `--review-state` or `--content`.
 - Review CLI
 - Attachment-lineage walk
 - Vendor SDK / Cursor agent transport / a second live provider
-- E4b private Specimen A
+- Human evaluation as a durable Chronicle event (E5)
+- Private E4b source or observation text in this repository
 - Redesigning provenance `partial`

@@ -173,7 +173,11 @@ Edits are **new derived records**, not in-place rewrites.
 Human-authored content defaults to `recognized`. Agent-authored
 content defaults to `unreviewed` and requires a model identity.
 `interpret-source` always writes `unreviewed` and does not accept
-`--review-state`.
+`--review-state`. E4b measured that those machine records stayed
+`unreviewed` after a later human inspection. That inspection is not
+yet a Chronicle event; mutating `reviewState` in place would still be
+the wrong representation. See
+`docs/design/interpretation-policy.md` (E4b checkpoint).
 
 ## 7. How does privacy boundary enforcement work?
 
