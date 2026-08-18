@@ -105,7 +105,8 @@ Human evaluation (PRD-0027 E5) is a seventh handler:
 read of `DerivedRecordStore`. It appends a `DerivedEvaluation` only
 when the evaluated record (and any supplied or preceding cite)
 resolves at write time. It does not mutate the evaluated record or
-invoke a model. See `docs/design/evaluation.md`.
+invoke a model. E5 measured that path against the three E4b machine
+interpretations (see `docs/design/evaluation.md`).
 
 ### Dependency direction
 

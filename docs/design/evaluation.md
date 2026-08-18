@@ -173,6 +173,79 @@ Exit 0: `recorded` | `already-present` | `dry-run`.
 
 Env: `CHRONICLE_EVALUATION_DIR`, `CHRONICLE_DERIVED_DIR`.
 
+## E5 — measured local experiment (2026-08-18)
+
+E5 asked whether a later human judgment can be recorded as an
+append-only Chronicle artifact against pre-existing machine
+interpretations — without mutating those records, invoking a model,
+or collapsing evidence support with personal recognition.
+
+It is an experiment, not a product feature and not a
+current-understanding claim.
+
+The private smoke used the three committed E4b machine
+`candidate-observation` records. Private source text, observation
+text, ids, conversation titles, filenames, and evaluation prose are
+not in this repository.
+
+### Sanitized result
+
+| Field | Measured |
+| --- | --- |
+| Engine revision | `a4bc74b` (#20) |
+| Pre-existing machine interpretations | 3 (E4b committed `candidate-observation`) |
+| Human evaluation acts | 3 |
+| `evidenceSupport` | `supported` × 3 |
+| `personalRecognition` | omitted |
+| Human `evaluatedAt` | review event time (`2026-08-18T21:18:00.000Z`), not machine `createdAt` and not persist-time `now` |
+| Dry-run durable artifacts | none |
+| Persistence | exactly 3 evaluation artifacts |
+| Machine records after persist | byte-identical, `reviewState` still `unreviewed` |
+| Backward provenance | `ok` × 3 |
+| Forward provenance | `ok` × 4 |
+| Provider / model invocation | none |
+| Activity / Daily Chronicle / promotion | none |
+| Public private-data write | none |
+
+Dry-run resolved all three machine records and wrote nothing.
+Persist then wrote one evaluation per machine record. Each evaluation
+set `evidenceSupport = supported` and omitted `personalRecognition`.
+No note, supplied correction, or preceding evaluation was recorded.
+
+Backward walks from each evaluation were `ok`:
+`evaluation → interpretation → execution → definition / source`.
+Forward walks from each of the four selected source nodes were `ok`:
+`source → execution → interpretations → evaluations`.
+Each forward walk saw the three machine interpretations and the three
+evaluations.
+
+### Proven
+
+- Human evaluation can be recorded append-only without mutating the
+  machine interpretation
+- Evidence support and personal recognition remain independent. The
+  smoke exercised evidence support only
+- Evaluation participates bidirectionally in provenance
+- A later mind can distinguish source, machine interpretation, and
+  subsequent human evaluation as separate historical artifacts
+- The human evaluation layer requires no new model invocation
+
+### Not proven
+
+- Current understanding
+- Personal recognition semantics in real use
+- Correction semantics in private use
+- Disagreement between evaluators
+- Competing machine interpretations
+- Longitudinal evaluation
+- Biography / profile generation
+- Automatic selection of durable memory
+- Model reliability
+
+Three append-only evaluations of one committed interpretation set are
+not a claim about current understanding or about how a person
+recognizes themselves over time.
+
 ## Out of scope
 
 - Current-understanding view / biography / profile
