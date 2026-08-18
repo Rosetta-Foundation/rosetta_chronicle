@@ -5,6 +5,7 @@ import {
   getChatGptInventoryHandler,
   getDailyChronicleHandler,
   getDerivedRecordHandler,
+  getTransformationHandler,
 } from '../index';
 import { CHRONICLE_TOKENS } from '../tokens';
 
@@ -60,5 +61,14 @@ describe('getDerivedRecordHandler', () => {
     const handler = getDerivedRecordHandler();
     expect(handler).toBeDefined();
     expect(typeof handler.handle).toBe('function');
+  });
+});
+
+describe('getTransformationHandler', () => {
+  it('resolves the transformation handler with its dependency graph', () => {
+    const handler = getTransformationHandler();
+    expect(handler).toBeDefined();
+    expect(typeof handler.handle).toBe('function');
+    expect(typeof handler.provenance).toBe('function');
   });
 });

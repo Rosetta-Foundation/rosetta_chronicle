@@ -141,6 +141,7 @@ export const buildDerivedRecord = (input: {
   createdAt: string;
   confidence?: number;
   reviewState: DerivedReviewState;
+  executionId?: string;
 }): DerivedRecord => {
   const contentRef = sha256Hex(input.content);
   return {
@@ -159,5 +160,6 @@ export const buildDerivedRecord = (input: {
     content: input.content,
     ...(input.confidence != null ? { confidence: input.confidence } : {}),
     reviewState: input.reviewState,
+    ...(input.executionId ? { executionId: input.executionId } : {}),
   };
 };

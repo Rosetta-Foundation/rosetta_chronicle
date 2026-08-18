@@ -46,7 +46,9 @@ immutable source archive   (bytes stay outside this repo for now)
         ↓
 normalized conversation graph   (Phase 2)
         ↓
-derived record                  (inspectable transformation)
+transformation execution        (named recipe run)
+        ↓
+derived record                  (inspectable interpretation event)
         ↓
 later: Chronicle representation / reflection
         ↓
