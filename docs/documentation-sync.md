@@ -123,9 +123,11 @@ Implemented:
   (`candidate-observation` / `interpret-source`; not Activity)
 - live xAI Responses HTTP transport for interpret-source
   (`XAI_API_KEY`, `grok-4.6`, `reasoning_effort=high`; no vendor SDK)
-- E4b measured locally (one bounded xAI / `grok-4.6` invoke;
-  sanitized result in `docs/design/interpretation-policy.md`;
-  private source and observations are not in this repository)
+- E4b measured locally (two physical xAI / `grok-4.6` invocations
+  against the private specimen: first transport failure
+  `not-committed`, second committed interpretation; sanitized
+  result in `docs/design/interpretation-policy.md`; private source
+  and observations are not in this repository)
 
 Not implemented:
 

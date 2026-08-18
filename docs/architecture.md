@@ -95,9 +95,10 @@ resolves private source ephemerally, invokes a model, and publishes
 `candidate-observation` derived records **only after** the
 corresponding execution is durable. Occurrences are operational
 receipts, not provenance-graph nodes. Direct human `record-derived`
-lineage (`source → derived`) is unchanged. E4b measured one live
-bounded invoke of that path; the sanitized result is in
-`docs/design/interpretation-policy.md`.
+lineage (`source → derived`) is unchanged. E4b measured that
+committed path on a live xAI invoke (the second of two physical
+specimen invocations; see
+`docs/design/interpretation-policy.md`).
 
 ### Dependency direction
 

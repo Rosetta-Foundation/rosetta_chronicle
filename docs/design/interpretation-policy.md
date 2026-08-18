@@ -291,6 +291,9 @@ claim.
 | Privacy tripwire | pass |
 | Activity / Daily Chronicle / promotion | none |
 | Human review | all supported as classified |
+| Physical provider invocations | 2 (same private selection) |
+| First invocation | HTTP 410 / `unavailable` / `not-committed` |
+| Second invocation | `succeeded` / `observations` / `committed` |
 
 Additional sanitized behavioral finding: all three observations were
 supported by cited source text. The present image attachment was not
@@ -298,11 +301,20 @@ described or invented. The multimodal node was not cited.
 `supportNote` behaved as machine commentary rather than source. All
 machine observations remained `unreviewed` in Chronicle.
 
-A prior live attempt against the same selection failed as
-`unavailable` after xAI returned HTTP 410 for deprecated
-`search_parameters`. That receipt stayed `not-committed`. #18 omitted
-the field. The measured success above is the single subsequent invoke.
-There was no retry of a schema-valid result.
+The measured table above is the **second** physical xAI invocation.
+There were two live calls against the same private selection:
+
+1. Transport / provider failure. The adapter sent deprecated
+   `search_parameters`; xAI returned HTTP 410. Chronicle recorded
+   `unavailable` and `not-committed`. No derived records.
+2. After #18 omitted that field, the experiment was run again under
+   the corrected transport contract. That call produced the committed
+   interpretation above.
+
+The second call was **not** a retry of a schema-valid model result.
+Chronicle must not erase an unsuccessful physical invocation merely
+because it produced no epistemic artifact. Attempt history is why
+`ExecutionOccurrence` exists.
 
 ### Proven
 
@@ -312,6 +324,8 @@ There was no retry of a schema-valid result.
 - Transformation policy survives
 - Provider/model invocation identity survives
 - Physical invocation receipt survives
+- An unsuccessful physical invocation can leave a receipt without
+  committing interpretation
 - Machine observations begin `unreviewed`
 - Forward and backward provenance survive
 - Private source does not enter the public engine artifacts tested
@@ -326,7 +340,8 @@ There was no retry of a schema-valid result.
 - Reliable multimodal interpretation
 - Behavior with missing attachments
 - Biography
-- Automatic memory creation
+- Automatic selection or creation of meaningful personal memory at
+  scale
 - Current understanding
 - Conflict resolution
 - Review / evaluation semantics
@@ -335,8 +350,9 @@ There was no retry of a schema-valid result.
 - Wayfinder
 - Background interpretation
 
-One successful invoke is not a claim about model reliability. The
-human review act itself is **not** yet a Chronicle artifact.
+Two physical invokes, one of them committed, are not a claim about
+model reliability. The human review act itself is **not** yet a
+Chronicle artifact.
 
 ## Architecture
 

@@ -39,7 +39,8 @@ Those two shapes must not be collapsed. The walker still lists every
 durable derived file, so a machine `DerivedRecord` published without
 its execution would look like a direct human note on a forward walk.
 E4a therefore publishes the execution **before** the derived record.
-E4b measured that shape on one live xAI invoke: backward `ok` from
+E4b measured that shape on the committed live xAI invoke (the
+second of two physical specimen invocations): backward `ok` from
 each derived record and forward `ok` from each selected source node,
 with no direct `source → derived` machine lineage. See
 `docs/design/interpretation-policy.md`.
