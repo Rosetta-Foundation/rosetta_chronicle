@@ -99,6 +99,10 @@ lineage (`source → derived`) is unchanged. E4b measured that
 committed path on a live xAI invoke (the second of two physical
 specimen invocations; see
 `docs/design/interpretation-policy.md`).
+A local open-weight runtime, if added later, is another
+`IModelInvocationRepository` adapter on this same path — not a
+second interpretation feature and not E6. See
+`docs/design/local-model-adapter.md`.
 
 Human evaluation (PRD-0027 E5) is a seventh handler:
 `EvaluateHandler` → `EvaluationService` → `EvaluationStore` plus a

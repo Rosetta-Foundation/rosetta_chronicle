@@ -236,7 +236,8 @@ evaluations.
 - Personal recognition semantics in real use
 - Correction semantics in private use
 - Disagreement between evaluators
-- Competing machine interpretations
+- Competing machine interpretations (local adapter is backlog;
+  `docs/design/local-model-adapter.md`)
 - Longitudinal evaluation
 - Biography / profile generation
 - Automatic selection of durable memory
