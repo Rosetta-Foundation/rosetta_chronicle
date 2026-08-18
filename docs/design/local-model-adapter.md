@@ -112,34 +112,30 @@ evidence and the other on recognition. Disagreement is part of the
 historical record. Identity remains artifact identity. E6, if later
 approved, would project that history — it would not collapse it.
 
-## Open-weight candidates (dated, not a product pick)
+First competing-machines smoke should use **one** local model, the
+same policy, and the same source selection as the xAI path, then
+human evaluation of both `DerivedRecord`s. The experiment is two
+minds, not a size contest and not a ranking.
 
-This list is a **2026-08-18** snapshot of families commonly served
-by Ollama and similar local runtimes. It is not a Chronicle
-endorsement and will go stale. Pick by instruction-following and
-schema discipline (the `candidate-observation/1` contract), then by
-license and VRAM — not by chat-arena rank.
+## Choosing a local model
 
-| Family | Why it is a candidate | Caution |
-| --- | --- | --- |
-| Qwen 3 / 3.5 | Strong structured-output and instruction following; many Apache-2.0 sizes; wide VRAM ladder | Confirm the exact tag + digest before a smoke |
-| Gemma 4 | Apache 2.0; dense and MoE sizes that fit a workstation | Confirm the served digest, not only the display name |
-| Llama 3.3 / 4 | Mature ecosystem; easy to run | Meta community license, not Apache; Scout/Maverick need serious VRAM |
-| DeepSeek-R1 distills | Useful later as a *second* mind (reasoning style) | Often verbose; weaker first pick for strict JSON |
-| Mistral Small / Magistral | Lean Apache-2.0 European line | Confirm schema obedience on this prompt |
-| gpt-oss | Open weights on common local runtimes | Unproven on this observation contract |
+The engine does not name a default local model.
 
-First competing-machines smoke should use **one** local model, same
-policy and same source selection as the xAI path, then human
-evaluation of both `DerivedRecord`s. Suggested starting class:
+Pick a local model by:
 
-- **~8–16 GB** unified / VRAM: Qwen 3.x in the 7B–14B band
-- **~24–36 GB**: Qwen 3.x 32B or Gemma 4 26B/31B-class
-- Do **not** start with 70B+ or 400B-class MoE. The experiment is
-  two minds, not a size contest.
+- schema discipline on `candidate-observation/1`
+- exact artifact digest (not a marketing tag)
+- license
+- available hardware
 
 Embeddings, vision-only tags, and uncensored/roleplay fine-tunes
-are the wrong artifact for this path.
+are the wrong artifact class for this path.
+
+Family names, VRAM bands, and “looks good on this date” picks are
+operator guidance, not architecture. A disposable 2026-08-18
+snapshot lives at
+`docs/experiments/local-model-candidates-2026-08-18.md`. It is
+non-normative and will go stale.
 
 ## Out of scope (this backlog item)
 
