@@ -254,6 +254,7 @@ describe('InterpretationService', () => {
     expect(execution.configuration.promptTemplateId).toBe(
       'candidate-observation/1',
     );
+    expect(execution.configuration.reasoningEffort).toBeUndefined();
 
     const occurrence = JSON.parse(
       readFileSync(
@@ -307,6 +308,42 @@ describe('InterpretationService', () => {
         'source-node',
       ]),
     );
+  });
+
+  it('records xAI reasoningEffort on the occurrence configuration', async () => {
+    model.invoke.mockResolvedValue({
+      ok: true,
+      text: JSON.stringify({
+        result: 'insufficient-evidence',
+        citedNodeIds: ['node-linear-1'],
+      }),
+    });
+    const result = await interpret.interpret(
+      base({ provider: 'xAI', model: 'grok-4.6' }),
+    );
+    expect(result.status).toBe('recorded');
+    expect(model.invoke).toHaveBeenCalledWith(
+      expect.objectContaining({
+        provider: 'xAI',
+        model: 'grok-4.6',
+      }),
+    );
+    const occurrence = JSON.parse(
+      readFileSync(
+        join(occurrencesDir, `${result.occurrenceId}.json`),
+        'utf-8',
+      ),
+    );
+    expect(occurrence.producer.model).toBe('grok-4.6');
+    expect(occurrence.configuration.provider).toBe('xAI');
+    expect(occurrence.configuration.reasoningEffort).toBe('high');
+    const execution = JSON.parse(
+      readFileSync(
+        join(executionsDir, `${result.executionId}.json`),
+        'utf-8',
+      ),
+    );
+    expect(execution.configuration.reasoningEffort).toBe('high');
   });
 
   it('persists insufficient-evidence as epistemic success', async () => {

@@ -233,14 +233,27 @@ CLI stdout does not print source text or observation statements.
 and execution configuration. `providerRequestId` and provider-returned
 `modelVersion` live on the occurrence only.
 
-E4a does not vendor a provider SDK. Chronicle does not depend on
-`sdlc-workflow`. Default transport is a fixture file
-(`CHRONICLE_INTERPRET_MODEL_FIXTURE`) or `unavailable`. Live adapters
-should follow the existing `IModelRepository` convention
-(`ANTHROPIC_API_KEY` / `OPENAI_API_KEY`) in a later PR.
+Chronicle does not vendor a provider SDK and does not depend on
+`sdlc-workflow`. Transport order:
+
+1. `CHRONICLE_INTERPRET_MODEL_FIXTURE` if the file exists
+2. one xAI Responses HTTP call when `--provider` is `xAI` and
+   `XAI_API_KEY` is set (`model` `grok-4.6`, `reasoning_effort` `high`,
+   `store` false, search off)
+3. otherwise `unavailable`
+
+The live call returns response text plus `providerRequestId` /
+`modelVersion` when the API supplies them. Occurrence configuration
+records `provider`, `reasoningEffort: high`, and the requested model
+on `producer.model`. Do not record Cursor model display names.
+
+The adapter does not validate observation schema, persist the
+expanded prompt, or log credentials or source. A second provider,
+Cursor agent transport, and a vendored SDK are out of scope.
 
 Public tests use the synthetic ChatGPT export fixture and a mocked
-provider. E4b (private Specimen A smoke) is out of scope.
+HTTP transport. E4b private Specimen A smoke is a separate local
+experiment, not this repository.
 
 ## Architecture
 
@@ -275,7 +288,7 @@ chronicle interpret-source \
 
 Env: `CHRONICLE_DERIVED_DIR`, `CHRONICLE_EXECUTION_DIR`,
 `CHRONICLE_DEFINITION_DIR`, `CHRONICLE_OCCURRENCE_DIR`,
-`CHRONICLE_INTERPRET_MODEL_FIXTURE`.
+`CHRONICLE_INTERPRET_MODEL_FIXTURE`, `XAI_API_KEY`.
 
 Exit 0 only for `recorded` | `already-present` | `dry-run`.
 
@@ -288,6 +301,6 @@ promote, does not accept `--review-state` or `--content`.
 - `priorRecordIds` / `derived-record/2`
 - Review CLI
 - Attachment-lineage walk
-- Vendor SDK / live OpenAI or Anthropic adapter
+- Vendor SDK / Cursor agent transport / a second live provider
 - E4b private Specimen A
 - Redesigning provenance `partial`
