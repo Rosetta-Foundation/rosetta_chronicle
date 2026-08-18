@@ -495,6 +495,11 @@ export interface DerivedRecord {
   content?: string;
   confidence?: number;
   reviewState: DerivedReviewState;
+  /**
+   * Link to the execution that produced this event. Not part of `id`.
+   * Absent when the record was written with `record-derived` only.
+   */
+  executionId?: string;
 }
 
 /** Input to the derived-record handler. */
@@ -527,6 +532,109 @@ export interface DerivedRecordResult {
   contentRef?: string;
   createdAt?: string;
   reviewState?: DerivedReviewState;
+  error?: string;
+}
+
+// ─── Transformation registry / execution (PRD-0027) ──────────────────────────
+
+/**
+ * Named recipe in the engine registry. Not a run and not an output.
+ * Recipe `version` is independent of `DerivedRecord.transformationVersion`.
+ */
+export interface TransformationDefinition {
+  type: DerivedTransformationType;
+  version: string;
+  deterministic: boolean;
+  allowedProducerTypes: DerivedProducerType[];
+}
+
+/**
+ * One immutable run of a registered transformation. Owns process
+ * identity, configuration, and output handles — not derived content or
+ * review state.
+ */
+export interface TransformationExecution {
+  id: string;
+  transformationType: DerivedTransformationType;
+  transformationVersion: string;
+  sourceRefs: DerivedSourceRef[];
+  producer: DerivedProducer;
+  createdAt: string;
+  configuration: Record<string, unknown>;
+  deterministic: boolean;
+  outputRefs: string[];
+  outputContentRefs: string[];
+}
+
+/** Input to the named-transformation handler. */
+export interface TransformRecordInput {
+  outputDir: string;
+  executionsDir: string;
+  sourceGraphHash: string;
+  conversationId?: string;
+  nodeIds: string[];
+  transformationType: DerivedTransformationType;
+  transformationVersion: string;
+  createdBy: DerivedProducer;
+  content: string;
+  /** Extra derived bodies from the same execution. CLI sends one. */
+  extraContents?: string[];
+  configuration?: Record<string, unknown>;
+  createdAt?: string;
+  confidence?: number;
+  reviewState?: DerivedReviewState;
+  graphPath?: string;
+  dryRun?: boolean;
+}
+
+export type TransformRecordStatus =
+  | 'recorded'
+  | 'already-present'
+  | 'invalid';
+
+/** Result of running a named transformation. */
+export interface TransformRecordResult {
+  status: TransformRecordStatus;
+  executionId?: string;
+  executionPath?: string;
+  derivedIds?: string[];
+  derivedPaths?: string[];
+  createdAt?: string;
+  error?: string;
+}
+
+/**
+ * Provenance query. Exactly one of derived / execution / source /
+ * compare is set by the CLI.
+ */
+export interface ProvenanceQuery {
+  executionsDir: string;
+  outputDir?: string;
+  derivedId?: string;
+  executionId?: string;
+  sourceGraphHash?: string;
+  compareId?: string;
+  withId?: string;
+}
+
+export interface ProvenanceDifference {
+  field: string;
+  a: unknown;
+  b: unknown;
+}
+
+export type ProvenanceStatus = 'ok' | 'not-found' | 'invalid';
+
+/** Backward, forward, or compare walk over execution history. */
+export interface ProvenanceResult {
+  status: ProvenanceStatus;
+  derivedId?: string;
+  executionId?: string;
+  sourceRefs?: DerivedSourceRef[];
+  executionIds?: string[];
+  derivedIds?: string[];
+  execution?: TransformationExecution;
+  difference?: ProvenanceDifference[];
   error?: string;
 }
 

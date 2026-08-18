@@ -204,6 +204,10 @@ chronicle record-derived --output <dir> \
   --content <text>
 ```
 
+`record-derived` persists the event only. To record the process as well,
+use `chronicle transform-record` (see
+`docs/design/transformation-registry.md`).
+
 Does not emit Activity, does not write a Daily Chronicle, does not
 promote.
 

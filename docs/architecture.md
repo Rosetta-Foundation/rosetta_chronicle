@@ -56,12 +56,21 @@ The record is source structure, not an archive backup and not `Activity`; it doe
 enter Daily Chronicle synthesis. `chatgpt-export` stays off `ActivitySource`. See
 `docs/design/chatgpt-export-source-graph.md`.
 
-Derived records (PRD-0027 next phase) are a third handler:
+Derived records (PRD-0027) are a third handler:
 `DerivedRecordHandler` → `DerivedRecordService` → `DerivedRecordStore` (+ optional
 `ChatGptGraphStore.readAt` for ref checks). They persist an inspectable
-transformation with source-graph provenance. Content is human-created in this
-phase. They are not Activity, not automatic summaries, and not promotion. See
-`docs/design/derived-records.md`.
+transformation *event* with source-graph provenance. Content is human-created
+in this phase. They are not Activity, not automatic summaries, and not
+promotion. See `docs/design/derived-records.md`.
+
+Named transformations (PRD-0027) are a fourth handler:
+`TransformationHandler` → `TransformationService` → `TransformationRegistry` +
+`TransformationExecutionStore` + `DerivedRecordStore` (+ optional
+`ChatGptGraphStore.readAt`). They persist an immutable **execution** of a
+registered recipe and the derived record(s) it produced. Provenance walks
+backward (derived → execution → source), forward (source → executions →
+derived ids), and compare two executions. They are not Activity and do not
+summarize. See `docs/design/transformation-registry.md`.
 
 ### Dependency direction
 
@@ -87,6 +96,8 @@ Defined in `src/types.ts`:
 - **Evidence** — a reference back to the source artifact that justifies a statement (never fabricated).
 - **Tag** — an inferred category from the Rosetta tag taxonomy (see `mvp.md`).
 - **DailyChronicle** — the synthesized output document (the v0.1 deliverable).
+- **DerivedRecord** — an immutable interpretation *event* citing a source graph (not Activity).
+- **TransformationExecution** — one run of a named recipe; owns configuration and output handles.
 
 These types are the contract between the source repositories, the synthesis service, and downstream
 consumers.

@@ -18,6 +18,10 @@ import {
   DerivedRecordHandler,
 } from './derived-record.handler';
 import {
+  ITransformationHandler,
+  TransformationHandler,
+} from './transformation.handler';
+import {
   IChronicleService,
   ChronicleService,
 } from './services/chronicle.service';
@@ -33,6 +37,10 @@ import {
   IDerivedRecordService,
   DerivedRecordService,
 } from './services/derived-record.service';
+import {
+  ITransformationService,
+  TransformationService,
+} from './services/transformation.service';
 import { IGitRepository, GitRepository } from './repositories/git.repository';
 import {
   IGitDiscoveryRepository,
@@ -80,6 +88,14 @@ import {
   IDerivedRecordStore,
   DerivedRecordStore,
 } from './repositories/derived-record-store.repository';
+import {
+  ITransformationRegistry,
+  TransformationRegistry,
+} from './repositories/transformation-registry.repository';
+import {
+  ITransformationExecutionStore,
+  TransformationExecutionStore,
+} from './repositories/transformation-execution-store.repository';
 
 /**
  * Composition root. Wires the InversifyJS container and exposes a factory for
@@ -127,6 +143,14 @@ export const buildContainer = (): Container => {
   container
     .bind<IDerivedRecordStore>(CHRONICLE_TOKENS.DerivedRecordStore)
     .to(DerivedRecordStore);
+  container
+    .bind<ITransformationRegistry>(CHRONICLE_TOKENS.TransformationRegistry)
+    .to(TransformationRegistry);
+  container
+    .bind<ITransformationExecutionStore>(
+      CHRONICLE_TOKENS.TransformationExecutionStore,
+    )
+    .to(TransformationExecutionStore);
 
   // Services
   container
@@ -141,6 +165,9 @@ export const buildContainer = (): Container => {
   container
     .bind<IDerivedRecordService>(CHRONICLE_TOKENS.DerivedRecordService)
     .to(DerivedRecordService);
+  container
+    .bind<ITransformationService>(CHRONICLE_TOKENS.TransformationService)
+    .to(TransformationService);
 
   // Handlers
   container
@@ -155,6 +182,9 @@ export const buildContainer = (): Container => {
   container
     .bind<IDerivedRecordHandler>(CHRONICLE_TOKENS.DerivedRecordHandler)
     .to(DerivedRecordHandler);
+  container
+    .bind<ITransformationHandler>(CHRONICLE_TOKENS.TransformationHandler)
+    .to(TransformationHandler);
 
   return container;
 };
@@ -184,5 +214,12 @@ export const getChatGptImportHandler = (): IChatGptImportHandler => {
 export const getDerivedRecordHandler = (): IDerivedRecordHandler => {
   return buildContainer().get<IDerivedRecordHandler>(
     CHRONICLE_TOKENS.DerivedRecordHandler,
+  );
+};
+
+/** Resolve the transformation handler from a fresh container. */
+export const getTransformationHandler = (): ITransformationHandler => {
+  return buildContainer().get<ITransformationHandler>(
+    CHRONICLE_TOKENS.TransformationHandler,
   );
 };

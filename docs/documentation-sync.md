@@ -115,6 +115,8 @@ Implemented:
 - archive hashing
 - source-graph persistence (topology and type only; not Activity)
 - provenance-preserving derived records (human-authored; not Activity)
+- named transformation registry and immutable execution records
+- transformation provenance walk (backward, forward, compare)
 
 Not implemented:
 
@@ -227,7 +229,9 @@ source graph discovery
 ↓
 source-record persistence
 ↓
-future derived representations
+derived representations
+↓
+transformation registry / execution provenance
 
 The detailed path belongs in Chronicle records.
 

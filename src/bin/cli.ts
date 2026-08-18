@@ -5,6 +5,7 @@ import {
   getChatGptInventoryHandler,
   getChatGptImportHandler,
   getDerivedRecordHandler,
+  getTransformationHandler,
   buildContainer,
 } from '../index';
 import {
@@ -35,6 +36,9 @@ import { CHRONICLE_TOKENS } from '../tokens';
  *   chronicle inventory-chatgpt   Read-only ChatGPT export inventory (PRD-0027).
  *   chronicle import-chatgpt      Persist a stripped source graph (PRD-0027).
  *   chronicle record-derived      Persist a provenance-preserving derived record.
+ *   chronicle transform-record    Run a named transformation and persist execution.
+ *   chronicle transformation-provenance
+ *                                 Walk or compare transformation executions.
  *
  * Daily Chronicle commands write to the personal Chronicle repo
  * (CHRONICLE_REPO env var or --repo flag) and are idempotent by content hash.
@@ -48,6 +52,11 @@ Usage:
   chronicle inventory-chatgpt --export <path>
   chronicle import-chatgpt --export <path> --output <dir> [--dry-run]
   chronicle record-derived --output <dir> --source-graph-hash <hex> --type <kind> --producer-type <human|agent> --producer-name <name> --content <text> [--dry-run]
+  chronicle transform-record --type <kind> --version <n> --source-graph-hash <hex> --output <dir> --executions <dir> --producer-type <human|agent> --producer-name <name> --content <text> [--dry-run]
+  chronicle transformation-provenance --derived <id> --output <dir> --executions <dir>
+  chronicle transformation-provenance --execution <id> --executions <dir>
+  chronicle transformation-provenance --source-graph-hash <hex> --executions <dir>
+  chronicle transformation-provenance --compare <id> --with <id> --executions <dir>
   chronicle queue [show] [--repo <path>]
   chronicle queue add "<title>" [--jira KEY] [--prd NNNN/N] [--due DATE] [--repo <path>]
   chronicle queue done "<title-or-id>" [--repo <path>]
@@ -72,6 +81,12 @@ Commands:
   record-derived      Persist a derived record (human note, later AI
                       transformation) with source-graph provenance. Does
                       not emit Activity or write a Daily Chronicle.
+  transform-record    Run a named registry transformation and persist an
+                      immutable execution plus derived output. Does not
+                      emit Activity or write a Daily Chronicle.
+  transformation-provenance
+                      Walk backward from a derived record, forward from
+                      a source hash, or compare two executions.
 
 Options:
   --repo <path>       Absolute path to your personal Chronicle repo.
@@ -94,12 +109,22 @@ Options:
   --state <state>     Filter queue list by state (active|next|inbox|done).
   --export <path>     ChatGPT export directory or .zip
                       (inventory-chatgpt, import-chatgpt).
-  --output <dir>      Directory for import-chatgpt or record-derived JSON.
-                      Caller-chosen; the engine does not assume a personal
-                      Chronicle layout. Falls back to
-                      $CHRONICLE_SOURCE_GRAPH_DIR or $CHRONICLE_DERIVED_DIR.
+  --output <dir>      Directory for import-chatgpt, record-derived, or
+                      transform-record derived JSON. Caller-chosen; the
+                      engine does not assume a personal Chronicle layout.
+                      Falls back to $CHRONICLE_SOURCE_GRAPH_DIR or
+                      $CHRONICLE_DERIVED_DIR.
+  --executions <dir>  Directory for transformation execution JSON.
+                      Falls back to $CHRONICLE_EXECUTION_DIR.
   --source-graph-hash <hex>
                       Archive content hash the derived record cites.
+  --source-ref <hex>  Alias for --source-graph-hash.
+  --version <n>       Transformation recipe version (default 1).
+  --config <json>     Optional JSON object stored on the execution.
+  --derived <id>      Derived-record id for transformation-provenance.
+  --execution <id>    Execution id for transformation-provenance.
+  --compare <id>      First execution id to compare.
+  --with <id>         Second execution id to compare.
   --conversation-id <id>
                       Optional conversation id on the source graph.
   --node-id <id>      Optional source-graph node id (repeatable).
@@ -130,7 +155,11 @@ Environment variables:
   CHRONICLE_SOURCE_GRAPH_DIR
                       Default --output for import-chatgpt.
   CHRONICLE_DERIVED_DIR
-                      Default --output for record-derived.
+                      Default --output for record-derived and
+                      transform-record.
+  CHRONICLE_EXECUTION_DIR
+                      Default --executions for transform-record and
+                      transformation-provenance.
 `.trim();
 
 interface ParsedArgs {
@@ -166,6 +195,13 @@ interface ParsedArgs {
   graphPath?: string;
   confidence?: number;
   reviewState?: string;
+  executionsDir?: string;
+  transformationVersion?: string;
+  configJson?: string;
+  derivedId?: string;
+  executionId?: string;
+  compareId?: string;
+  withId?: string;
 }
 
 function parseArgs(argv: string[]): ParsedArgs {
@@ -255,7 +291,29 @@ function parseArgs(argv: string[]): ParsedArgs {
         result.outputDir = args[++i];
         break;
       case '--source-graph-hash':
+      case '--source-ref':
         result.sourceGraphHash = args[++i];
+        break;
+      case '--executions':
+        result.executionsDir = args[++i];
+        break;
+      case '--version':
+        result.transformationVersion = args[++i];
+        break;
+      case '--config':
+        result.configJson = args[++i];
+        break;
+      case '--derived':
+        result.derivedId = args[++i];
+        break;
+      case '--execution':
+        result.executionId = args[++i];
+        break;
+      case '--compare':
+        result.compareId = args[++i];
+        break;
+      case '--with':
+        result.withId = args[++i];
         break;
       case '--conversation-id':
         result.conversationId = args[++i];
@@ -715,6 +773,93 @@ async function runRecordDerived(args: ParsedArgs): Promise<void> {
   if (result.status === 'invalid') process.exit(1);
 }
 
+async function runTransformRecord(args: ParsedArgs): Promise<void> {
+  const outputDir = args.outputDir ?? process.env['CHRONICLE_DERIVED_DIR'];
+  if (!outputDir)
+    die(
+      '--output <dir> (or $CHRONICLE_DERIVED_DIR) is required for transform-record',
+    );
+  const executionsDir =
+    args.executionsDir ?? process.env['CHRONICLE_EXECUTION_DIR'];
+  if (!executionsDir)
+    die(
+      '--executions <dir> (or $CHRONICLE_EXECUTION_DIR) is required for transform-record',
+    );
+  if (!args.sourceGraphHash)
+    die('--source-graph-hash (or --source-ref) is required for transform-record');
+  if (!args.transformationType) die('--type is required for transform-record');
+  if (!args.producerType)
+    die('--producer-type is required for transform-record');
+  if (!args.producerName)
+    die('--producer-name is required for transform-record');
+  let content = args.content;
+  if (args.contentFile) {
+    content = readFileSync(args.contentFile, 'utf-8');
+  }
+  if (content == null) die('--content or --content-file is required');
+  let configuration: Record<string, unknown> | undefined;
+  if (args.configJson) {
+    try {
+      const parsed: unknown = JSON.parse(args.configJson);
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        die('--config must be a JSON object');
+      }
+      configuration = parsed as Record<string, unknown>;
+    } catch {
+      die('--config must be valid JSON');
+    }
+  }
+  const handler = getTransformationHandler();
+  const result = await handler.handle({
+    outputDir,
+    executionsDir,
+    sourceGraphHash: args.sourceGraphHash,
+    conversationId: args.conversationId,
+    nodeIds: args.nodeIds,
+    transformationType: args.transformationType as DerivedTransformationType,
+    transformationVersion: args.transformationVersion ?? '1',
+    createdBy: {
+      type: args.producerType as DerivedProducerType,
+      name: args.producerName,
+      ...(args.model ? { model: args.model } : {}),
+      ...(args.promptVersion ? { promptVersion: args.promptVersion } : {}),
+    },
+    content,
+    ...(configuration ? { configuration } : {}),
+    ...(args.confidence != null && !Number.isNaN(args.confidence)
+      ? { confidence: args.confidence }
+      : {}),
+    ...(args.reviewState
+      ? { reviewState: args.reviewState as DerivedReviewState }
+      : {}),
+    graphPath: args.graphPath,
+    dryRun: args.dryRun,
+  });
+  console.log(JSON.stringify(result, null, 2));
+  if (result.status === 'invalid') process.exit(1);
+}
+
+async function runTransformationProvenance(args: ParsedArgs): Promise<void> {
+  const executionsDir =
+    args.executionsDir ?? process.env['CHRONICLE_EXECUTION_DIR'];
+  if (!executionsDir)
+    die(
+      '--executions <dir> (or $CHRONICLE_EXECUTION_DIR) is required for transformation-provenance',
+    );
+  const handler = getTransformationHandler();
+  const result = await handler.provenance({
+    executionsDir,
+    outputDir: args.outputDir ?? process.env['CHRONICLE_DERIVED_DIR'],
+    derivedId: args.derivedId,
+    executionId: args.executionId,
+    sourceGraphHash: args.sourceGraphHash,
+    compareId: args.compareId,
+    withId: args.withId,
+  });
+  console.log(JSON.stringify(result, null, 2));
+  if (result.status !== 'ok') process.exit(1);
+}
+
 async function main(): Promise<void> {
   const args = parseArgs(process.argv);
 
@@ -736,6 +881,12 @@ async function main(): Promise<void> {
       break;
     case 'record-derived':
       await runRecordDerived(args);
+      break;
+    case 'transform-record':
+      await runTransformRecord(args);
+      break;
+    case 'transformation-provenance':
+      await runTransformationProvenance(args);
       break;
     default:
       console.error(`chronicle: unknown command '${args.command}'\n`);

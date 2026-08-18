@@ -44,6 +44,8 @@ describe('chronicle CLI', () => {
     expect(result.stdout).toContain('inventory-chatgpt');
     expect(result.stdout).toContain('import-chatgpt');
     expect(result.stdout).toContain('record-derived');
+    expect(result.stdout).toContain('transform-record');
+    expect(result.stdout).toContain('transformation-provenance');
   });
 
   it('inventory-chatgpt exits 1 without --export', () => {
@@ -190,6 +192,63 @@ describe('chronicle CLI', () => {
       );
     } finally {
       rmSync(out, { recursive: true, force: true });
+    }
+  });
+
+  it('transform-record writes execution and derived without Daily Chronicle', () => {
+    const out = mkdtempSync(join(tmpdir(), 'cli-xform-'));
+    const execDir = mkdtempSync(join(tmpdir(), 'cli-exec-'));
+    try {
+      const result = spawnSync(
+        process.execPath,
+        [
+          CLI,
+          'transform-record',
+          '--output',
+          out,
+          '--executions',
+          execDir,
+          '--source-ref',
+          'a'.repeat(64),
+          '--type',
+          'human-note',
+          '--version',
+          '1',
+          '--producer-type',
+          'human',
+          '--producer-name',
+          'fixture',
+          '--content',
+          'SYNTHETIC_DERIVED_NOTE',
+        ],
+        { encoding: 'utf-8' },
+      );
+      expect(result.status).toBe(0);
+      const parsed = JSON.parse(result.stdout);
+      expect(parsed.status).toBe('recorded');
+      expect(existsSync(parsed.executionPath)).toBe(true);
+      expect(existsSync(parsed.derivedPaths[0])).toBe(true);
+      expect(existsSync(join(out, 'chronicles'))).toBe(false);
+      const walk = spawnSync(
+        process.execPath,
+        [
+          CLI,
+          'transformation-provenance',
+          '--derived',
+          parsed.derivedIds[0],
+          '--output',
+          out,
+          '--executions',
+          execDir,
+        ],
+        { encoding: 'utf-8' },
+      );
+      expect(walk.status).toBe(0);
+      const provenance = JSON.parse(walk.stdout);
+      expect(provenance.executionId).toBe(parsed.executionId);
+    } finally {
+      rmSync(out, { recursive: true, force: true });
+      rmSync(execDir, { recursive: true, force: true });
     }
   });
 

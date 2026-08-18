@@ -13,12 +13,14 @@ export const CHRONICLE_TOKENS = {
   ChatGptInventoryHandler: Symbol.for('ChatGptInventoryHandler'),
   ChatGptImportHandler: Symbol.for('ChatGptImportHandler'),
   DerivedRecordHandler: Symbol.for('DerivedRecordHandler'),
+  TransformationHandler: Symbol.for('TransformationHandler'),
 
   // Services
   ChronicleService: Symbol.for('ChronicleService'),
   ChatGptInventoryService: Symbol.for('ChatGptInventoryService'),
   ChatGptImportService: Symbol.for('ChatGptImportService'),
   DerivedRecordService: Symbol.for('DerivedRecordService'),
+  TransformationService: Symbol.for('TransformationService'),
 
   // Repositories (one per source)
   GitRepository: Symbol.for('GitRepository'),
@@ -37,4 +39,6 @@ export const CHRONICLE_TOKENS = {
   QueueStore: Symbol.for('QueueStore'),
   ChatGptGraphStore: Symbol.for('ChatGptGraphStore'),
   DerivedRecordStore: Symbol.for('DerivedRecordStore'),
+  TransformationRegistry: Symbol.for('TransformationRegistry'),
+  TransformationExecutionStore: Symbol.for('TransformationExecutionStore'),
 } as const;
