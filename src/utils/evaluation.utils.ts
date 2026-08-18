@@ -24,6 +24,9 @@ export const PERSONAL_RECOGNITION_VALUES = [
 
 const ISO_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/;
 
+export const isEvaluationTime = (value: unknown): value is string =>
+  typeof value === 'string' && ISO_TIME.test(value);
+
 /**
  * Immutable evaluation-act id. Timestamp participates: the same
  * judgment in 2026 and 2028 is two events. Persist time does not.
@@ -64,57 +67,139 @@ export const evaluationId = (input: {
   );
 
 /**
- * Recompute identity and, when both are present, the note hash.
- * A stored id that does not match these fields is corruption, not a
- * different review.
+ * Runtime schema for a persisted evaluation. Identity is a second
+ * check — a self-consistent illegal enum is still invalid.
  */
-export const evaluationIntegrityOk = (
-  evaluation: DerivedEvaluation,
-): boolean => {
-  if (evaluation.evaluator.type !== 'human') return false;
-  if (!evaluation.evaluator.name.trim()) return false;
-  if (evaluation.note != null && evaluation.noteRef == null) return false;
+export const evaluationSchemaOk = (
+  rec: Record<string, unknown>,
+): rec is Record<string, unknown> & DerivedEvaluation => {
+  if (rec.schemaVersion !== DERIVED_EVALUATION_VERSION) return false;
+  if (typeof rec.id !== 'string' || !CONTENT_HASH.test(rec.id)) return false;
   if (
-    evaluation.note != null &&
-    evaluation.noteRef != null &&
-    sha256Hex(evaluation.note) !== evaluation.noteRef
+    typeof rec.evaluatedRecordId !== 'string' ||
+    !CONTENT_HASH.test(rec.evaluatedRecordId)
   ) {
     return false;
   }
-  return (
-    evaluationId({
-      evaluatedRecordId: evaluation.evaluatedRecordId,
-      evaluator: {
-        type: 'human',
-        name: evaluation.evaluator.name,
-      },
-      evaluatedAt: evaluation.evaluatedAt,
-      evidenceSupport: evaluation.evidenceSupport,
-      personalRecognition: evaluation.personalRecognition,
-      noteRef: evaluation.noteRef,
-      suppliedRecordId: evaluation.suppliedRecordId,
-      precedingEvaluationId: evaluation.precedingEvaluationId,
-    }) === evaluation.id
-  );
+  if (!isEvaluationTime(rec.evaluatedAt)) return false;
+  if (!isEvaluationTime(rec.recordedAt)) return false;
+  if (!rec.evaluator || typeof rec.evaluator !== 'object') return false;
+  const evaluator = rec.evaluator as Record<string, unknown>;
+  if (evaluator.type !== 'human') return false;
+  if (typeof evaluator.name !== 'string' || !evaluator.name.trim()) {
+    return false;
+  }
+  const keys = Object.keys(evaluator).sort();
+  if (keys.length !== 2 || keys[0] !== 'name' || keys[1] !== 'type') {
+    return false;
+  }
+  const hasEvidence = rec.evidenceSupport !== undefined;
+  const hasRecognition = rec.personalRecognition !== undefined;
+  if (!hasEvidence && !hasRecognition) return false;
+  if (
+    hasEvidence &&
+    (typeof rec.evidenceSupport !== 'string' ||
+      !EVIDENCE_SUPPORT_VALUES.includes(
+        rec.evidenceSupport as EvidenceSupport,
+      ))
+  ) {
+    return false;
+  }
+  if (
+    hasRecognition &&
+    (typeof rec.personalRecognition !== 'string' ||
+      !PERSONAL_RECOGNITION_VALUES.includes(
+        rec.personalRecognition as PersonalRecognition,
+      ))
+  ) {
+    return false;
+  }
+  if (rec.suppliedRecordId !== undefined) {
+    if (
+      typeof rec.suppliedRecordId !== 'string' ||
+      !CONTENT_HASH.test(rec.suppliedRecordId) ||
+      rec.suppliedRecordId === rec.evaluatedRecordId
+    ) {
+      return false;
+    }
+  }
+  if (rec.precedingEvaluationId !== undefined) {
+    if (
+      typeof rec.precedingEvaluationId !== 'string' ||
+      !CONTENT_HASH.test(rec.precedingEvaluationId)
+    ) {
+      return false;
+    }
+  }
+  if (rec.noteRef !== undefined) {
+    if (typeof rec.noteRef !== 'string' || !CONTENT_HASH.test(rec.noteRef)) {
+      return false;
+    }
+  }
+  if (rec.note !== undefined) {
+    if (typeof rec.note !== 'string') return false;
+    if (typeof rec.noteRef !== 'string') return false;
+    if (sha256Hex(rec.note) !== rec.noteRef) return false;
+  }
+  return true;
 };
 
-/** Shape + identity check. Null means unreadable as an evaluation. */
+/**
+ * Recompute identity from schema-valid fields. A stored id that does
+ * not match is corruption, not a different review.
+ */
+export const evaluationIntegrityOk = (
+  evaluation: DerivedEvaluation,
+): boolean =>
+  evaluationId({
+    evaluatedRecordId: evaluation.evaluatedRecordId,
+    evaluator: {
+      type: 'human',
+      name: evaluation.evaluator.name,
+    },
+    evaluatedAt: evaluation.evaluatedAt,
+    evidenceSupport: evaluation.evidenceSupport,
+    personalRecognition: evaluation.personalRecognition,
+    noteRef: evaluation.noteRef,
+    suppliedRecordId: evaluation.suppliedRecordId,
+    precedingEvaluationId: evaluation.precedingEvaluationId,
+  }) === evaluation.id;
+
+/**
+ * Schema validity and content-addressed identity. Null means the
+ * artifact is not a resolvable evaluation.
+ */
 export const asDerivedEvaluation = (
   value: unknown,
 ): DerivedEvaluation | null => {
   if (!value || typeof value !== 'object') return null;
   const rec = value as Record<string, unknown>;
-  if (rec.schemaVersion !== DERIVED_EVALUATION_VERSION) return null;
-  if (typeof rec.id !== 'string') return null;
-  if (typeof rec.evaluatedRecordId !== 'string') return null;
-  if (typeof rec.evaluatedAt !== 'string') return null;
-  if (typeof rec.recordedAt !== 'string') return null;
-  if (!rec.evaluator || typeof rec.evaluator !== 'object') return null;
-  const evaluator = rec.evaluator as Record<string, unknown>;
-  if (typeof evaluator.type !== 'string' || typeof evaluator.name !== 'string') {
-    return null;
-  }
-  const evaluation = value as DerivedEvaluation;
+  if (!evaluationSchemaOk(rec)) return null;
+  const evaluation: DerivedEvaluation = {
+    schemaVersion: DERIVED_EVALUATION_VERSION,
+    id: rec.id as string,
+    evaluatedRecordId: rec.evaluatedRecordId as string,
+    evaluator: {
+      type: 'human',
+      name: (rec.evaluator as { name: string }).name,
+    },
+    evaluatedAt: rec.evaluatedAt as string,
+    recordedAt: rec.recordedAt as string,
+    ...(rec.evidenceSupport
+      ? { evidenceSupport: rec.evidenceSupport as EvidenceSupport }
+      : {}),
+    ...(rec.personalRecognition
+      ? { personalRecognition: rec.personalRecognition as PersonalRecognition }
+      : {}),
+    ...(typeof rec.noteRef === 'string' ? { noteRef: rec.noteRef } : {}),
+    ...(typeof rec.note === 'string' ? { note: rec.note } : {}),
+    ...(typeof rec.suppliedRecordId === 'string'
+      ? { suppliedRecordId: rec.suppliedRecordId }
+      : {}),
+    ...(typeof rec.precedingEvaluationId === 'string'
+      ? { precedingEvaluationId: rec.precedingEvaluationId }
+      : {}),
+  };
   return evaluationIntegrityOk(evaluation) ? evaluation : null;
 };
 
@@ -153,10 +238,10 @@ export const validateEvaluationDraft = (
   ) {
     errors.push(`unknown-personal-recognition:${input.personalRecognition}`);
   }
-  if (input.evaluatedAt && !ISO_TIME.test(input.evaluatedAt)) {
+  if (input.evaluatedAt && !isEvaluationTime(input.evaluatedAt)) {
     errors.push('evaluated-at-invalid');
   }
-  if (input.recordedAt && !ISO_TIME.test(input.recordedAt)) {
+  if (input.recordedAt && !isEvaluationTime(input.recordedAt)) {
     errors.push('recorded-at-invalid');
   }
   if (input.suppliedRecordId && !CONTENT_HASH.test(input.suppliedRecordId)) {

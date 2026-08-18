@@ -830,6 +830,10 @@ export interface DerivedEvaluation {
   noteRef?: string;
   note?: string;
   suppliedRecordId?: string;
+  /**
+   * Optional cite of an earlier evaluation *act*, not necessarily of
+   * the same DerivedRecord. "This evaluation responds to that one."
+   */
   precedingEvaluationId?: string;
 }
 

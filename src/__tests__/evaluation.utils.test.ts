@@ -5,6 +5,7 @@ import {
   evaluationIntegrityOk,
   validateEvaluationDraft,
 } from '../utils/evaluation.utils';
+import { EvaluationActor } from '../types';
 
 const HASH = 'a'.repeat(64);
 const HASH_B = 'b'.repeat(64);
@@ -110,6 +111,68 @@ describe('evaluation.utils', () => {
     ).toBe(false);
     expect(
       asDerivedEvaluation({ ...record, evidenceSupport: 'uncertain' }),
+    ).toBeNull();
+  });
+
+  it('rejects self-consistent artifacts that fail the schema', () => {
+    const selfConsistent = (overrides: Record<string, unknown>) => {
+      const rec: Record<string, unknown> = {
+        schemaVersion: 'derived-evaluation/1',
+        evaluatedRecordId: HASH,
+        evaluator: { type: 'human', name: 'operator' },
+        evaluatedAt: WHEN,
+        recordedAt: WHEN,
+        evidenceSupport: 'supported',
+        ...overrides,
+      };
+      return {
+        ...rec,
+        id: evaluationId({
+          evaluatedRecordId: rec.evaluatedRecordId as string,
+          evaluator: rec.evaluator as EvaluationActor,
+          evaluatedAt: rec.evaluatedAt as string,
+          evidenceSupport: rec.evidenceSupport as never,
+          personalRecognition: rec.personalRecognition as never,
+          noteRef: rec.noteRef as string | undefined,
+          suppliedRecordId: rec.suppliedRecordId as string | undefined,
+          precedingEvaluationId: rec.precedingEvaluationId as string | undefined,
+        }),
+      };
+    };
+
+    expect(
+      asDerivedEvaluation(selfConsistent({ evidenceSupport: 'banana' })),
+    ).toBeNull();
+    expect(
+      asDerivedEvaluation(
+        selfConsistent({
+          evidenceSupport: undefined,
+          personalRecognition: 'banana',
+        }),
+      ),
+    ).toBeNull();
+    expect(
+      asDerivedEvaluation(
+        selfConsistent({
+          evidenceSupport: undefined,
+          personalRecognition: undefined,
+        }),
+      ),
+    ).toBeNull();
+    expect(
+      asDerivedEvaluation(
+        selfConsistent({ evaluatedRecordId: 'nope' }),
+      ),
+    ).toBeNull();
+    expect(
+      asDerivedEvaluation(selfConsistent({ evaluatedAt: 'yesterday' })),
+    ).toBeNull();
+    expect(
+      asDerivedEvaluation(
+        selfConsistent({
+          evaluator: { type: 'agent', name: 'bot' },
+        }),
+      ),
     ).toBeNull();
   });
 });

@@ -3,7 +3,11 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import { EvaluationStore } from '../repositories/evaluation-store.repository';
 import { sha256Hex } from '../utils/chatgpt-export.utils';
-import { buildDerivedEvaluation } from '../utils/evaluation.utils';
+import {
+  buildDerivedEvaluation,
+  evaluationId,
+} from '../utils/evaluation.utils';
+import { EvaluationActor } from '../types';
 
 const WHEN = '2026-08-18T22:00:00.000Z';
 const NOTE = 'SYNTHETIC_EVALUATION_NOTE';
@@ -103,5 +107,29 @@ describe('EvaluationStore', () => {
     expect(readFileSync(join(dir, `${record.id}.json`), 'utf-8')).toBe(
       '{not-json',
     );
+  });
+
+  it('rejects a self-consistent file with an illegal schema value', async () => {
+    const store = new EvaluationStore();
+    const rec = {
+      schemaVersion: 'derived-evaluation/1' as const,
+      evaluatedRecordId: 'a'.repeat(64),
+      evaluator: { type: 'human' as const, name: 'fixture' },
+      evaluatedAt: WHEN,
+      recordedAt: WHEN,
+      evidenceSupport: 'banana',
+    };
+    const id = evaluationId({
+      evaluatedRecordId: rec.evaluatedRecordId,
+      evaluator: rec.evaluator as EvaluationActor,
+      evaluatedAt: rec.evaluatedAt,
+      evidenceSupport: rec.evidenceSupport as never,
+    });
+    writeFileSync(
+      join(dir, `${id}.json`),
+      JSON.stringify({ ...rec, id }, null, 2) + '\n',
+    );
+    expect(await store.read(dir, id)).toBeNull();
+    expect(await store.diagnose(dir, id)).toBe('invalid');
   });
 });
