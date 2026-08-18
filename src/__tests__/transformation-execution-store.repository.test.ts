@@ -6,6 +6,7 @@ import { TransformationExecution } from '../types';
 
 const execution = (): TransformationExecution => ({
   id: 'c'.repeat(64),
+  definitionId: 'b'.repeat(64),
   transformationType: 'human-note',
   transformationVersion: '1',
   sourceRefs: [{ sourceGraphHash: 'a'.repeat(64), nodeIds: [] }],

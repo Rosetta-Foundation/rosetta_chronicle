@@ -116,7 +116,8 @@ Implemented:
 - source-graph persistence (topology and type only; not Activity)
 - provenance-preserving derived records (human-authored; not Activity)
 - named transformation registry and immutable execution records
-- transformation provenance walk (backward, forward, compare)
+- persisted transformation definition artifacts (recipe identity)
+- transformation provenance walk (derived → execution → definition → source)
 
 Not implemented:
 
@@ -232,6 +233,8 @@ source-record persistence
 derived representations
 ↓
 transformation registry / execution provenance
+↓
+persisted transformation definitions
 
 The detailed path belongs in Chronicle records.
 

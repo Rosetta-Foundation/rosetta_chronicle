@@ -538,23 +538,35 @@ export interface DerivedRecordResult {
 // ─── Transformation registry / execution (PRD-0027) ──────────────────────────
 
 /**
- * Named recipe in the engine registry. Not a run and not an output.
+ * In-memory bootstrap recipe. Not a run and not an output.
  * Recipe `version` is independent of `DerivedRecord.transformationVersion`.
  */
-export interface TransformationDefinition {
+export interface TransformationRecipe {
   type: DerivedTransformationType;
   version: string;
+  description: string;
   deterministic: boolean;
   allowedProducerTypes: DerivedProducerType[];
 }
 
 /**
+ * Persisted immutable recipe artifact. Identity is the content hash of
+ * the recipe fields — not the execution that later cites it.
+ */
+export interface TransformationDefinition extends TransformationRecipe {
+  id: string;
+  createdAt: string;
+  contentHash: string;
+}
+
+/**
  * One immutable run of a registered transformation. Owns process
  * identity, configuration, and output handles — not derived content or
- * review state.
+ * review state. `definitionId` is the exact recipe artifact used.
  */
 export interface TransformationExecution {
   id: string;
+  definitionId: string;
   transformationType: DerivedTransformationType;
   transformationVersion: string;
   sourceRefs: DerivedSourceRef[];
@@ -570,6 +582,7 @@ export interface TransformationExecution {
 export interface TransformRecordInput {
   outputDir: string;
   executionsDir: string;
+  definitionsDir: string;
   sourceGraphHash: string;
   conversationId?: string;
   nodeIds: string[];
@@ -597,6 +610,8 @@ export interface TransformRecordResult {
   status: TransformRecordStatus;
   executionId?: string;
   executionPath?: string;
+  definitionId?: string;
+  definitionPath?: string;
   derivedIds?: string[];
   derivedPaths?: string[];
   createdAt?: string;
@@ -605,13 +620,15 @@ export interface TransformRecordResult {
 
 /**
  * Provenance query. Exactly one of derived / execution / source /
- * compare is set by the CLI.
+ * definition / compare is set by the CLI.
  */
 export interface ProvenanceQuery {
   executionsDir: string;
+  definitionsDir?: string;
   outputDir?: string;
   derivedId?: string;
   executionId?: string;
+  definitionId?: string;
   sourceGraphHash?: string;
   compareId?: string;
   withId?: string;
@@ -630,10 +647,12 @@ export interface ProvenanceResult {
   status: ProvenanceStatus;
   derivedId?: string;
   executionId?: string;
+  definitionId?: string;
   sourceRefs?: DerivedSourceRef[];
   executionIds?: string[];
   derivedIds?: string[];
   execution?: TransformationExecution;
+  definition?: TransformationDefinition;
   difference?: ProvenanceDifference[];
   error?: string;
 }

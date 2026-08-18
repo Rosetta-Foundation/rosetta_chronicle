@@ -65,12 +65,16 @@ promotion. See `docs/design/derived-records.md`.
 
 Named transformations (PRD-0027) are a fourth handler:
 `TransformationHandler` → `TransformationService` → `TransformationRegistry` +
-`TransformationExecutionStore` + `DerivedRecordStore` (+ optional
-`ChatGptGraphStore.readAt`). They persist an immutable **execution** of a
-registered recipe and the derived record(s) it produced. Provenance walks
-backward (derived → execution → source), forward (source → executions →
-derived ids), and compare two executions. They are not Activity and do not
-summarize. See `docs/design/transformation-registry.md`.
+`TransformationDefinitionStore` + `TransformationExecutionStore` +
+`DerivedRecordStore` (+ optional `ChatGptGraphStore.readAt`). The in-memory
+registry bootstraps recipes; the definition store persists the immutable
+artifact an execution cites. Provenance walks derived → execution →
+definition → source, forward from a definition or source hash, and compare
+two executions. They are not Activity and do not summarize. See
+`docs/design/transformation-registry.md`.
+
+Definitions explain the recipe. Executions explain the run. Derived records
+explain the interpretation.
 
 ### Dependency direction
 
@@ -97,7 +101,8 @@ Defined in `src/types.ts`:
 - **Tag** — an inferred category from the Rosetta tag taxonomy (see `mvp.md`).
 - **DailyChronicle** — the synthesized output document (the v0.1 deliverable).
 - **DerivedRecord** — an immutable interpretation *event* citing a source graph (not Activity).
-- **TransformationExecution** — one run of a named recipe; owns configuration and output handles.
+- **TransformationDefinition** — persisted immutable recipe (type, version, description, flags).
+- **TransformationExecution** — one run of a named recipe; cites `definitionId`.
 
 These types are the contract between the source repositories, the synthesis service, and downstream
 consumers.

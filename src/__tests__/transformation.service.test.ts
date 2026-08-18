@@ -21,6 +21,9 @@ const {
 const {
   TransformationExecutionStore,
 } = require('../repositories/transformation-execution-store.repository');
+const {
+  TransformationDefinitionStore,
+} = require('../repositories/transformation-definition-store.repository');
 
 const HASH = 'b'.repeat(64);
 const CREATED = '2026-08-17T21:00:00.000Z';
@@ -29,9 +32,11 @@ const CONTENT = 'SYNTHETIC_DERIVED_NOTE';
 const baseInput = (
   outputDir: string,
   executionsDir: string,
+  definitionsDir: string,
 ): TransformRecordInput => ({
   outputDir,
   executionsDir,
+  definitionsDir,
   sourceGraphHash: HASH,
   conversationId: 'conv-1',
   nodeIds: ['n1'],
@@ -45,6 +50,7 @@ const baseInput = (
 describe('TransformationService', () => {
   let outputDir: string;
   let executionsDir: string;
+  let definitionsDir: string;
   let service: {
     transform: (
       input: TransformRecordInput,
@@ -55,6 +61,7 @@ describe('TransformationService', () => {
   beforeEach(() => {
     outputDir = mkdtempSync(join(tmpdir(), 'derived-xform-'));
     executionsDir = mkdtempSync(join(tmpdir(), 'exec-xform-'));
+    definitionsDir = mkdtempSync(join(tmpdir(), 'def-xform-'));
     const container = new Container();
     container
       .bind(CHRONICLE_TOKENS.DerivedRecordStore)
@@ -63,6 +70,9 @@ describe('TransformationService', () => {
     container
       .bind(CHRONICLE_TOKENS.TransformationRegistry)
       .to(TransformationRegistry);
+    container
+      .bind(CHRONICLE_TOKENS.TransformationDefinitionStore)
+      .to(TransformationDefinitionStore);
     container
       .bind(CHRONICLE_TOKENS.TransformationExecutionStore)
       .to(TransformationExecutionStore);
@@ -74,10 +84,11 @@ describe('TransformationService', () => {
   afterEach(() => {
     rmSync(outputDir, { recursive: true, force: true });
     rmSync(executionsDir, { recursive: true, force: true });
+    rmSync(definitionsDir, { recursive: true, force: true });
   });
 
   it('persists an execution and derived record without Activity', async () => {
-    const result = await service.transform(baseInput(outputDir, executionsDir));
+    const result = await service.transform(baseInput(outputDir, executionsDir, definitionsDir));
     expect(result.status).toBe('recorded');
     expect(result.createdAt).toBe(CREATED);
     expect(existsSync(result.executionPath as string)).toBe(true);
@@ -92,6 +103,18 @@ describe('TransformationService', () => {
       nodeIds: ['n1'],
     });
     expect(execution.outputRefs).toEqual(result.derivedIds);
+    expect(execution.definitionId).toBe(result.definitionId);
+    expect(existsSync(result.definitionPath as string)).toBe(true);
+    const definition = JSON.parse(
+      readFileSync(result.definitionPath as string, 'utf-8'),
+    );
+    expect(definition.type).toBe('human-note');
+    expect(definition.version).toBe('1');
+    expect(definition.id).toBe(definition.contentHash);
+    expect(JSON.stringify(definition)).not.toContain(CONTENT);
+    expect(JSON.stringify(definition)).not.toMatch(
+      /"source"\s*:\s*"chatgpt-export"/,
+    );
     const derived = JSON.parse(
       readFileSync((result.derivedPaths as string[])[0], 'utf-8'),
     );
@@ -100,12 +123,13 @@ describe('TransformationService', () => {
     expect(derived.transformationVersion).toBe('derived-record/1');
     expect(existsSync(join(outputDir, 'chronicles'))).toBe(false);
     expect(existsSync(join(executionsDir, 'chronicles'))).toBe(false);
+    expect(existsSync(join(definitionsDir, 'chronicles'))).toBe(false);
   });
 
   it('re-run of the same identity keeps createdAt', async () => {
-    const first = await service.transform(baseInput(outputDir, executionsDir));
+    const first = await service.transform(baseInput(outputDir, executionsDir, definitionsDir));
     const second = await service.transform({
-      ...baseInput(outputDir, executionsDir),
+      ...baseInput(outputDir, executionsDir, definitionsDir),
       createdAt: '2026-08-18T00:00:00.000Z',
     });
     expect(second.status).toBe('already-present');
@@ -114,9 +138,9 @@ describe('TransformationService', () => {
   });
 
   it('records two transformations from the same source', async () => {
-    const note = await service.transform(baseInput(outputDir, executionsDir));
+    const note = await service.transform(baseInput(outputDir, executionsDir, definitionsDir));
     const insight = await service.transform({
-      ...baseInput(outputDir, executionsDir),
+      ...baseInput(outputDir, executionsDir, definitionsDir),
       transformationType: 'insight',
       content: 'SYNTHETIC_INSIGHT_NOTE',
     });
@@ -135,7 +159,7 @@ describe('TransformationService', () => {
 
   it('supports multiple derived records from one execution', async () => {
     const result = await service.transform({
-      ...baseInput(outputDir, executionsDir),
+      ...baseInput(outputDir, executionsDir, definitionsDir),
       extraContents: ['SYNTHETIC_SECOND_NOTE'],
     });
     expect(result.status).toBe('recorded');
@@ -147,19 +171,37 @@ describe('TransformationService', () => {
   });
 
   it('walks backward from a derived record and compares re-runs', async () => {
-    const first = await service.transform(baseInput(outputDir, executionsDir));
+    const first = await service.transform(baseInput(outputDir, executionsDir, definitionsDir));
     const second = await service.transform({
-      ...baseInput(outputDir, executionsDir),
+      ...baseInput(outputDir, executionsDir, definitionsDir),
       content: 'SYNTHETIC_OTHER_NOTE',
       configuration: { tone: 'brief' },
     });
     const backward = await service.provenance({
       executionsDir,
+      definitionsDir,
       outputDir,
       derivedId: (first.derivedIds as string[])[0],
     });
     expect(backward.status).toBe('ok');
     expect(backward.executionId).toBe(first.executionId);
+    expect(backward.definitionId).toBe(first.definitionId);
+    expect(backward.definition).toEqual(
+      expect.objectContaining({
+        type: 'human-note',
+        version: '1',
+        id: first.definitionId,
+      }),
+    );
+    const fromDef = await service.provenance({
+      executionsDir,
+      definitionsDir,
+      definitionId: first.definitionId,
+    });
+    expect(fromDef.status).toBe('ok');
+    expect(fromDef.executionIds).toEqual(
+      expect.arrayContaining([first.executionId, second.executionId]),
+    );
     expect(backward.sourceRefs).toEqual([
       {
         sourceGraphHash: HASH,
@@ -180,7 +222,7 @@ describe('TransformationService', () => {
 
   it('rejects an unknown recipe version and does not write Activity', async () => {
     const result = await service.transform({
-      ...baseInput(outputDir, executionsDir),
+      ...baseInput(outputDir, executionsDir, definitionsDir),
       transformationVersion: '9',
     });
     expect(result.status).toBe('invalid');

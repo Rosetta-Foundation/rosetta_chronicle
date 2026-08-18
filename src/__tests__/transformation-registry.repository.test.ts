@@ -7,6 +7,7 @@ describe('TransformationRegistry', () => {
     expect(note).toEqual({
       type: 'human-note',
       version: '1',
+      description: 'Caller-supplied note citing source-graph structure.',
       deterministic: true,
       allowedProducerTypes: ['human', 'agent'],
     });

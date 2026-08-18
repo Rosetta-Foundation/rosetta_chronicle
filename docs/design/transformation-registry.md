@@ -12,7 +12,9 @@ Source Artifact
         ↓
 Source Graph
         ↓
-Transformation Execution   (this phase — the process run)
+Transformation Definition  (immutable recipe artifact)
+        ↓
+Transformation Execution   (the process run)
         ↓
 Derived Record             (the resulting interpretation event)
         ↓
@@ -32,9 +34,13 @@ The goal is not automatic summarization. It is to answer:
 
 | Record | Owns |
 | --- | --- |
-| **Transformation** (registry entry) | Named recipe: type, recipe version, deterministic flag, allowed producers |
-| **TransformationExecution** | One run of a recipe: when, configuration, source refs, producer, output handles |
+| **TransformationRecipe** (in-memory bootstrap) | Current catalog row the engine knows how to run |
+| **TransformationDefinition** | Persisted immutable recipe: type, version, description, flags, content hash |
+| **TransformationExecution** | One run of a recipe: when, configuration, source refs, producer, output handles, `definitionId` |
 | **DerivedRecord** | The interpretation event: content, content hash, review state, confidence |
+
+Definitions explain the recipe. Executions explain the run. Derived
+records explain the interpretation.
 
 `DerivedRecord.transformationVersion` remains the **record schema**
 (`derived-record/1`) and stays in the derived-record id. Recipe version
@@ -76,12 +82,22 @@ not generate content.
 
 ## 2. Transformation identity
 
-Recipe identity is `(type, version)` in the registry.
+Bootstrap identity is `(type, version)` in the in-memory registry.
+
+Definition identity is the SHA-256 of:
+
+```text
+{ type, version, description, deterministic, allowedProducerTypes }
+```
+
+`createdAt` is not in the definition id. The same recipe fields are the
+same artifact (`already-present`; first `createdAt` kept). Changing
+description or flags is a new id, even if type@version is unchanged.
 
 Execution identity is the SHA-256 of:
 
 ```text
-{ transformationType, transformationVersion, sourceRefs,
+{ definitionId, transformationType, transformationVersion, sourceRefs,
   producer, configuration, outputContentRefs }
 ```
 
@@ -98,8 +114,20 @@ recipe is future work — this phase does not invent or run one.
 ## 3. TransformationExecution
 
 ```ts
+interface TransformationDefinition {
+  id: string;                  // === contentHash
+  type: DerivedTransformationType;
+  version: string;
+  description: string;
+  deterministic: boolean;
+  allowedProducerTypes: DerivedProducerType[];
+  createdAt: string;
+  contentHash: string;
+}
+
 interface TransformationExecution {
   id: string;
+  definitionId: string;        // exact persisted recipe
   transformationType: DerivedTransformationType;
   transformationVersion: string; // recipe version, e.g. '1'
   sourceRefs: DerivedSourceRef[];
@@ -111,6 +139,11 @@ interface TransformationExecution {
   outputContentRefs: string[]; // content hashes (compare without bodies)
 }
 ```
+
+The in-memory registry remains the bootstrap source. `transform-record`
+materializes a definition into `--definitions` / `CHRONICLE_DEFINITION_DIR`
+before writing the execution. A definition is immutable once written;
+executions never mutate it.
 
 One execution may list multiple `outputRefs` when a single invocation
 emits more than one derived record. The CLI emits one. Executions are
@@ -124,15 +157,18 @@ layout is encoded.
 ## 4. Provenance chain
 
 ```text
-Source Archive → Source Graph → Transformation Execution → Derived Record
+Source Archive → Source Graph → Transformation Definition
+        → Transformation Execution → Derived Record
 ```
 
-Backward ("what created this?"): derived `executionId`, or a scan of
-executions whose `outputRefs` contain the derived id, then
-`sourceRefs`.
+Backward ("what created this?"): derived `executionId` →
+`definitionId` → `sourceRefs`.
 
-Forward ("what was created from this?"): executions whose
-`sourceRefs` cite the archive hash, then their `outputRefs`.
+Forward from a definition: executions whose `definitionId` matches,
+then their `outputRefs`.
+
+Forward from a source: executions whose `sourceRefs` cite the archive
+hash, then their `outputRefs`.
 
 Compare ("what would be different?"): field-level difference between
 two executions (type, recipe version, refs, producer, configuration,
@@ -144,10 +180,14 @@ for identity.
 ```
 chronicle transform-record --type human-note --version 1 \
   --source-graph-hash <hex> --output <dir> --executions <dir> \
+  --definitions <dir> \
   --producer-type human --producer-name <name> --content <text>
 
 chronicle transformation-provenance --derived <id> \
-  --output <dir> --executions <dir>
+  --output <dir> --executions <dir> --definitions <dir>
+
+chronicle transformation-provenance --definition <id> \
+  --definitions <dir> --executions <dir>
 
 chronicle transformation-provenance --source-graph-hash <hex> \
   --executions <dir>
@@ -168,18 +208,25 @@ summarize.
 - Organizational promotion
 - Nondeterministic registered AI recipes
 
+## Review answers (this increment)
+
+1. **Definition identity is separate from execution identity.** The
+   definition id hashes recipe fields. The execution id hashes
+   `definitionId` plus the run (refs, producer, configuration, output
+   content hashes).
+2. **A historical execution can resolve its exact recipe.**
+   `execution.definitionId` points at the persisted artifact, not at
+   today's in-memory catalog row.
+3. **The source → interpretation → memory boundary holds.** No
+   Activity, Daily Chronicle, or promotion.
+4. **No premature AI machinery.** Recipes remain caller-supplied and
+   deterministic.
+
 ## Future considerations
 
-Neither of these is required for this phase. They are recorded so the
-path stays visible.
-
-1. **Persisted recipe definitions.** `TransformationDefinition` is an
-   in-process catalog today. Historical executions resolve type +
-   version against whatever the engine currently registers. If recipes
-   evolve in place, consider persisting and versioning the definition
-   itself so an old execution can load the exact recipe that existed
-   at run time.
-
+1. **Persisted recipe definitions.** Done in this increment: bootstrap
+   catalog → persisted `TransformationDefinition` → execution
+   `definitionId`.
 2. **Two kinds of derived record.** `executionId` is optional because
    `record-derived` (directly authored) and `transform-record`
    (recipe-produced) both write `DerivedRecord`. If transformation
