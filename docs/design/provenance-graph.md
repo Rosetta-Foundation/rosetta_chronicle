@@ -61,14 +61,16 @@ Handles only. Domain bodies stay in their stores.
 | `transformation-definition` | definition id |
 | `transformation-execution` | execution id |
 | `derived-record` | derived-record id |
+| `evaluation` | evaluation id |
 
 ### Edges
 
 | Type | Meaning |
 | --- | --- |
-| `cites` | Execution → definition; execution or derived → source archive / conversation / node |
+| `cites` | Execution → definition; execution or derived → source archive / conversation / node; evaluation → supplied derived |
 | `produces` | Execution → derived record |
 | `contains` | Archive → conversation → node (from a loaded source graph) |
+| `evaluates` | Evaluation → evaluated derived record |
 
 No separate edge index is persisted. Edges are rebuilt from stored
 fields on each query.
@@ -81,7 +83,8 @@ ProvenanceHandler → ProvenanceService → existing stores
 
 ```
 chronicle provenance --from <kind>:<id> --direction backward|forward \
-  --graphs <dir> --output <dir> --executions <dir> --definitions <dir>
+  --graphs <dir> --output <dir> --executions <dir> --definitions <dir> \
+  [--evaluations <dir>]
 ```
 
 `--from` examples (`execution` / `definition` are aliases for the
@@ -93,6 +96,7 @@ canonical kinds `transformation-execution` / `transformation-definition`):
 - `source-archive:<hex>`
 - `source-conversation:<hash>:<conversationId>`
 - `source-node:<hash>:<conversationId>:<nodeId>`
+- `evaluation:<hex>` (requires `--evaluations`)
 
 The result is a structured subgraph plus ordered paths:
 
@@ -121,7 +125,9 @@ failure code).
 definition, execution, derived record, graph, conversation, or node is
 `partial` with `definition-missing`, `definition-invalid`,
 `execution-missing`, `derived-missing`, `source-graph-missing`,
-`conversation-missing`, or `node-missing`.
+`conversation-missing`, `node-missing`, or
+`evaluated-record-missing` when a previously valid evaluation later
+loses its derived target.
 
 `partial` is this walker's integrity status. Machine interpretation
 does not add a new engine-wide status; a crash that leaves an

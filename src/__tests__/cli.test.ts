@@ -47,6 +47,7 @@ describe('chronicle CLI', () => {
     expect(result.stdout).toContain('transformation-provenance');
     expect(result.stdout).toContain('provenance');
     expect(result.stdout).toContain('interpret-source');
+    expect(result.stdout).toContain('evaluate-derived');
   });
 
   it('inventory-chatgpt exits 1 without --export', () => {
@@ -411,6 +412,96 @@ describe('chronicle CLI', () => {
       rmSync(execs, { recursive: true, force: true });
       rmSync(defs, { recursive: true, force: true });
       rmSync(occs, { recursive: true, force: true });
+    }
+  });
+
+  it('evaluate-derived exits 1 without --derived', () => {
+    const result = spawnSync(process.execPath, [CLI, 'evaluate-derived'], {
+      encoding: 'utf-8',
+    });
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('--derived');
+  });
+
+  it('evaluate-derived rejects a non-human evaluator', () => {
+    const result = spawnSync(
+      process.execPath,
+      [CLI, 'evaluate-derived', '--evaluator-type', 'agent', '--derived', 'a'.repeat(64)],
+      { encoding: 'utf-8' },
+    );
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('human evaluators only');
+  });
+
+  it('evaluate-derived writes ids without note prose', () => {
+    const derivedDir = mkdtempSync(join(tmpdir(), 'cli-eval-derived-'));
+    const evalDir = mkdtempSync(join(tmpdir(), 'cli-eval-store-'));
+    try {
+      const recorded = spawnSync(
+        process.execPath,
+        [
+          CLI,
+          'record-derived',
+          '--output',
+          derivedDir,
+          '--source-graph-hash',
+          'a'.repeat(64),
+          '--conversation-id',
+          'conv-1',
+          '--node-id',
+          'n1',
+          '--type',
+          'human-note',
+          '--producer-type',
+          'human',
+          '--producer-name',
+          'fixture',
+          '--content',
+          'SYNTHETIC_DERIVED_NOTE',
+          '--review-state',
+          'unreviewed',
+        ],
+        { encoding: 'utf-8' },
+      );
+      expect(recorded.status).toBe(0);
+      const derivedId = JSON.parse(recorded.stdout).id as string;
+      const result = spawnSync(
+        process.execPath,
+        [
+          CLI,
+          'evaluate-derived',
+          '--derived',
+          derivedId,
+          '--evaluator-name',
+          'operator',
+          '--evidence-support',
+          'supported',
+          '--note',
+          'SYNTHETIC_EVALUATION_NOTE',
+          '--evaluated-at',
+          '2026-08-18T22:00:00.000Z',
+          '--output',
+          derivedDir,
+          '--evaluations',
+          evalDir,
+        ],
+        { encoding: 'utf-8' },
+      );
+      expect(result.status).toBe(0);
+      const parsed = JSON.parse(result.stdout);
+      expect(parsed.status).toBe('recorded');
+      expect(parsed.evaluatedRecordId).toBe(derivedId);
+      expect(result.stdout).not.toContain('SYNTHETIC_EVALUATION_NOTE');
+      expect(readFileSync(parsed.path, 'utf-8')).toContain(
+        'SYNTHETIC_EVALUATION_NOTE',
+      );
+      const derivedFile = JSON.parse(
+        readFileSync(join(derivedDir, `${derivedId}.json`), 'utf-8'),
+      );
+      expect(derivedFile.reviewState).toBe('unreviewed');
+    } finally {
+      rmSync(derivedDir, { recursive: true, force: true });
+      rmSync(evalDir, { recursive: true, force: true });
     }
   });
 

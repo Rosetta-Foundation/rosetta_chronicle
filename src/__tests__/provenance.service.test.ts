@@ -28,6 +28,12 @@ const {
 const {
   TransformationDefinitionStore,
 } = require('../repositories/transformation-definition-store.repository');
+const {
+  EvaluationStore,
+} = require('../repositories/evaluation-store.repository');
+const {
+  EvaluationService,
+} = require('../services/evaluation.service');
 
 const HASH = 'b'.repeat(64);
 const HASH_B = 'd'.repeat(64);
@@ -89,6 +95,7 @@ describe('ProvenanceService', () => {
   let executionsDir: string;
   let definitionsDir: string;
   let graphsDir: string;
+  let evaluationsDir: string;
   let transform: {
     transform: (input: TransformRecordInput) => Promise<Record<string, unknown>>;
   };
@@ -98,12 +105,16 @@ describe('ProvenanceService', () => {
   let provenance: {
     traverse: (input: Record<string, unknown>) => Promise<Record<string, unknown>>;
   };
+  let evaluate: {
+    evaluate: (input: Record<string, unknown>) => Promise<Record<string, unknown>>;
+  };
 
   beforeEach(async () => {
     outputDir = mkdtempSync(join(tmpdir(), 'prov-derived-'));
     executionsDir = mkdtempSync(join(tmpdir(), 'prov-exec-'));
     definitionsDir = mkdtempSync(join(tmpdir(), 'prov-def-'));
     graphsDir = mkdtempSync(join(tmpdir(), 'prov-graph-'));
+    evaluationsDir = mkdtempSync(join(tmpdir(), 'prov-eval-'));
     const container = new Container();
     container.bind(CHRONICLE_TOKENS.DerivedRecordStore).to(DerivedRecordStore);
     container.bind(CHRONICLE_TOKENS.ChatGptGraphStore).to(ChatGptGraphStore);
@@ -116,6 +127,8 @@ describe('ProvenanceService', () => {
     container
       .bind(CHRONICLE_TOKENS.TransformationExecutionStore)
       .to(TransformationExecutionStore);
+    container.bind(CHRONICLE_TOKENS.EvaluationStore).to(EvaluationStore);
+    container.bind(CHRONICLE_TOKENS.EvaluationService).to(EvaluationService);
     container
       .bind(CHRONICLE_TOKENS.TransformationService)
       .to(TransformationService);
@@ -126,6 +139,7 @@ describe('ProvenanceService', () => {
     transform = container.get(CHRONICLE_TOKENS.TransformationService);
     derived = container.get(CHRONICLE_TOKENS.DerivedRecordService);
     provenance = container.get(CHRONICLE_TOKENS.ProvenanceService);
+    evaluate = container.get(CHRONICLE_TOKENS.EvaluationService);
     const store = new ChatGptGraphStore();
     await store.write(graphsDir, graph());
   });
@@ -134,6 +148,7 @@ describe('ProvenanceService', () => {
     rmSync(executionsDir, { recursive: true, force: true });
     rmSync(definitionsDir, { recursive: true, force: true });
     rmSync(graphsDir, { recursive: true, force: true });
+    rmSync(evaluationsDir, { recursive: true, force: true });
   });
 
   const dirs = () => ({
@@ -413,5 +428,142 @@ describe('ProvenanceService', () => {
     expect(JSON.stringify(a.nodes)).toBe(JSON.stringify(b.nodes));
     expect(JSON.stringify(a.edges)).toBe(JSON.stringify(b.edges));
     expect(JSON.stringify(a.paths)).toBe(JSON.stringify(b.paths));
+  });
+
+  it('walks source → execution → derived → evaluation forward', async () => {
+    const recorded = await transform.transform(
+      transformInput(outputDir, executionsDir, definitionsDir),
+    );
+    const derivedId = (recorded.derivedIds as string[])[0];
+    const ev = await evaluate.evaluate({
+      outputDir,
+      evaluationsDir,
+      evaluatedRecordId: derivedId,
+      evaluatorName: 'operator',
+      evidenceSupport: 'supported',
+      evaluatedAt: CREATED,
+    });
+    const result = await provenance.traverse({
+      ...dirs(),
+      evaluationsDir,
+      start: { kind: 'source-node', id: `${HASH}:conv-1:n1` },
+      direction: 'forward',
+    });
+    expect(result.status).toBe('ok');
+    const kinds = (result.nodes as { kind: string }[]).map((n) => n.kind);
+    expect(kinds).toEqual(
+      expect.arrayContaining([
+        'source-node',
+        'transformation-execution',
+        'derived-record',
+        'evaluation',
+      ]),
+    );
+    expect(result.edges).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'evaluates',
+          from: { kind: 'evaluation', id: ev.id },
+          to: { kind: 'derived-record', id: derivedId },
+        }),
+      ]),
+    );
+    const pathKinds = (result.paths as { nodes: { kind: string }[] }[]).some(
+      (path) => {
+        const sequence = path.nodes.map((n) => n.kind).join('>');
+        return (
+          sequence.includes('source-node') &&
+          sequence.includes('transformation-execution') &&
+          sequence.includes('derived-record') &&
+          sequence.includes('evaluation')
+        );
+      },
+    );
+    expect(pathKinds).toBe(true);
+  });
+
+  it('walks backward from evaluation to source and marks a later hole', async () => {
+    const recorded = await transform.transform(
+      transformInput(outputDir, executionsDir, definitionsDir),
+    );
+    const derivedId = (recorded.derivedIds as string[])[0];
+    const ev = await evaluate.evaluate({
+      outputDir,
+      evaluationsDir,
+      evaluatedRecordId: derivedId,
+      evaluatorName: 'operator',
+      evidenceSupport: 'supported',
+      evaluatedAt: CREATED,
+    });
+    const ok = await provenance.traverse({
+      ...dirs(),
+      evaluationsDir,
+      start: { kind: 'evaluation', id: ev.id as string },
+      direction: 'backward',
+    });
+    expect(ok.status).toBe('ok');
+    const kinds = (ok.nodes as { kind: string }[]).map((n) => n.kind);
+    expect(kinds).toEqual(
+      expect.arrayContaining([
+        'evaluation',
+        'derived-record',
+        'transformation-execution',
+        'transformation-definition',
+        'source-node',
+      ]),
+    );
+
+    rmSync(join(outputDir, `${derivedId}.json`));
+    const hole = await provenance.traverse({
+      ...dirs(),
+      evaluationsDir,
+      start: { kind: 'evaluation', id: ev.id as string },
+      direction: 'backward',
+    });
+    expect(hole.status).toBe('partial');
+    expect(
+      (hole.failures as { code: string }[]).map((row) => row.code),
+    ).toContain('evaluated-record-missing');
+  });
+
+  it('cites a supplied correction record from the evaluation', async () => {
+    const x = await transform.transform(
+      transformInput(outputDir, executionsDir, definitionsDir),
+    );
+    const y = await derived.record({
+      outputDir,
+      sourceGraphHash: HASH,
+      conversationId: 'conv-1',
+      nodeIds: ['n1'],
+      transformationType: 'human-note',
+      createdBy: { type: 'human', name: 'fixture' },
+      content: 'SYNTHETIC_HUMAN_Y',
+      createdAt: CREATED,
+    });
+    const ev = await evaluate.evaluate({
+      outputDir,
+      evaluationsDir,
+      evaluatedRecordId: (x.derivedIds as string[])[0],
+      evaluatorName: 'operator',
+      evidenceSupport: 'not-supported',
+      suppliedRecordId: y.id,
+      evaluatedAt: CREATED,
+    });
+    const result = await provenance.traverse({
+      ...dirs(),
+      evaluationsDir,
+      start: { kind: 'evaluation', id: ev.id as string },
+      direction: 'backward',
+    });
+    expect(result.status).toBe('ok');
+    expect(result.edges).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'cites',
+          from: { kind: 'evaluation', id: ev.id },
+          to: { kind: 'derived-record', id: y.id },
+        }),
+      ]),
+    );
   });
 });

@@ -790,6 +790,87 @@ export type ModelInvokeResult =
       failureClass: ProviderFailureClass;
     };
 
+// ─── Derived evaluation (E5 human review) ────────────────────────────────────
+
+/**
+ * Whether the cited source supports the interpretation as classified.
+ * Independent of {@link PersonalRecognition}.
+ */
+export type EvidenceSupport = 'supported' | 'not-supported' | 'uncertain';
+
+/**
+ * The evaluator's present relationship to the interpretation — not an
+ * objective truth judgment. Independent of {@link EvidenceSupport}.
+ */
+export type PersonalRecognition = 'recognized' | 'rejected' | 'uncertain';
+
+/** Who performed the evaluation act. E5 accepts human only. */
+export interface EvaluationActor {
+  type: 'human';
+  name: string;
+}
+
+/**
+ * Append-only human evaluation of one DerivedRecord.
+ *
+ * Does not mutate the evaluated record. `evaluatedAt` is the event time
+ * of the human act and participates in identity. `recordedAt` is
+ * persistence time and does not.
+ */
+export interface DerivedEvaluation {
+  schemaVersion: 'derived-evaluation/1';
+  id: string;
+  evaluatedRecordId: string;
+  evaluator: EvaluationActor;
+  evaluatedAt: string;
+  recordedAt: string;
+  evidenceSupport?: EvidenceSupport;
+  personalRecognition?: PersonalRecognition;
+  noteRef?: string;
+  note?: string;
+  suppliedRecordId?: string;
+  precedingEvaluationId?: string;
+}
+
+/** Input to evaluate-derived. Dimensions are optional but at least one. */
+export interface EvaluateDerivedInput {
+  outputDir: string;
+  evaluationsDir: string;
+  evaluatedRecordId: string;
+  evaluatorName: string;
+  evidenceSupport?: EvidenceSupport;
+  personalRecognition?: PersonalRecognition;
+  note?: string;
+  suppliedRecordId?: string;
+  precedingEvaluationId?: string;
+  evaluatedAt?: string;
+  recordedAt?: string;
+  dryRun?: boolean;
+}
+
+export type EvaluateDerivedStatus =
+  | 'recorded'
+  | 'already-present'
+  | 'dry-run'
+  | 'invalid'
+  | 'not-found';
+
+/**
+ * Result of evaluate-derived. Never includes evaluation note prose —
+ * that may be private derived material.
+ */
+export interface EvaluateDerivedResult {
+  status: EvaluateDerivedStatus;
+  id?: string;
+  path?: string;
+  evaluatedRecordId?: string;
+  evaluatedAt?: string;
+  evidenceSupport?: EvidenceSupport;
+  personalRecognition?: PersonalRecognition;
+  suppliedRecordId?: string;
+  error?: string;
+}
+
 /**
  * Provenance query. Exactly one of derived / execution / source /
  * definition / compare is set by the CLI.
@@ -841,15 +922,21 @@ export type ProvenanceNodeKind =
   | 'source-node'
   | 'transformation-definition'
   | 'transformation-execution'
-  | 'derived-record';
+  | 'derived-record'
+  | 'evaluation';
 
 /**
  * Canonical directed edge types. An execution *cites* a definition and
  * source material; it *produces* derived records. A source graph
  * *contains* conversations and nodes. Direct derived records *cite*
- * source material without an execution.
+ * source material without an execution. An evaluation *evaluates* a
+ * derived record and may *cite* a supplied correction record.
  */
-export type ProvenanceEdgeType = 'contains' | 'cites' | 'produces';
+export type ProvenanceEdgeType =
+  | 'contains'
+  | 'cites'
+  | 'produces'
+  | 'evaluates';
 
 export type ProvenanceDirection = 'backward' | 'forward';
 
@@ -895,6 +982,8 @@ export interface ProvenanceTraverseInput {
   outputDir: string;
   executionsDir: string;
   definitionsDir: string;
+  /** Optional. Required when `--from evaluation:` is used. */
+  evaluationsDir?: string;
 }
 
 /** Structured subgraph plus ordered paths and explicit integrity holes. */

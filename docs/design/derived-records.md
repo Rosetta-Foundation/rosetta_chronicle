@@ -166,17 +166,17 @@ Edits are **new derived records**, not in-place rewrites.
   derived id).
 - `reviewState` on a record is the current evaluation seed
   (`unreviewed` / `recognized` / `rejected` / `corrected` /
-  `uncertain`). Replacing it in a later phase becomes an append-only
-  `ReflectionEvaluation` (PRD-0027 Phase 3). This phase does not
-  rewrite history to change meaning.
+  `uncertain`). Human review of a specific derived record is an
+  append-only `DerivedEvaluation` (`docs/design/evaluation.md`). This
+  phase does not rewrite history to change meaning.
 
 Human-authored content defaults to `recognized`. Agent-authored
 content defaults to `unreviewed` and requires a model identity.
 `interpret-source` always writes `unreviewed` and does not accept
 `--review-state`. E4b measured that those machine records stayed
 `unreviewed` after a later human inspection. That inspection is not
-yet a Chronicle event; mutating `reviewState` in place would still be
-the wrong representation. See
+yet a creation fact on that record. Human evaluation is a new
+artifact; see `docs/design/evaluation.md`. See
 `docs/design/interpretation-policy.md` (E4b checkpoint).
 
 ## 7. How does privacy boundary enforcement work?

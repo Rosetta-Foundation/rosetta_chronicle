@@ -2,6 +2,7 @@ import { inject, injectable } from 'inversify';
 import { CHRONICLE_TOKENS } from '../tokens';
 import {
   ChatGptSourceGraph,
+  DerivedEvaluation,
   DerivedRecord,
   ProvenanceFailure,
   ProvenanceNode,
@@ -12,6 +13,7 @@ import {
 } from '../types';
 import type { IChatGptGraphStore } from '../repositories/chatgpt-graph-store.repository';
 import type { IDerivedRecordStore } from '../repositories/derived-record-store.repository';
+import type { IEvaluationStore } from '../repositories/evaluation-store.repository';
 import type { ITransformationDefinitionStore } from '../repositories/transformation-definition-store.repository';
 import type { ITransformationExecutionStore } from '../repositories/transformation-execution-store.repository';
 import {
@@ -56,6 +58,8 @@ export class ProvenanceService implements IProvenanceService {
     private readonly _definitionStore: ITransformationDefinitionStore,
     @inject(CHRONICLE_TOKENS.ChatGptGraphStore)
     private readonly _graphStore: IChatGptGraphStore,
+    @inject(CHRONICLE_TOKENS.EvaluationStore)
+    private readonly _evaluationStore: IEvaluationStore,
   ) {}
 
   /** @inheritDoc */
@@ -78,7 +82,15 @@ export class ProvenanceService implements IProvenanceService {
 
     const derived = await this._recordStore.list(input.outputDir);
     const executions = await this._executionStore.list(input.executionsDir);
-    const startOk = await this.startExists(input, derived, executions);
+    const evaluations = input.evaluationsDir
+      ? await this._evaluationStore.list(input.evaluationsDir)
+      : [];
+    const startOk = await this.startExists(
+      input,
+      derived,
+      executions,
+      evaluations,
+    );
     if (!startOk) {
       return {
         status: 'not-found',
@@ -99,6 +111,7 @@ export class ProvenanceService implements IProvenanceService {
       executions,
       derived,
       graphs,
+      evaluations,
     });
     let paths = collectPaths(input.start, input.direction, edges, []);
     let reachable = this.reachable(input.start, paths);
@@ -114,7 +127,12 @@ export class ProvenanceService implements IProvenanceService {
         attempted,
         failures,
       );
-      const next = buildProvenanceEdges({ executions, derived, graphs });
+      const next = buildProvenanceEdges({
+        executions,
+        derived,
+        graphs,
+        evaluations,
+      });
       const walkFailures: ProvenanceFailure[] = [];
       const nextPaths = collectPaths(
         input.start,
@@ -161,6 +179,9 @@ export class ProvenanceService implements IProvenanceService {
     if (!input.executionsDir) return 'executions-dir-required';
     if (!input.definitionsDir) return 'definitions-dir-required';
     if (!input.graphsDir) return 'graphs-dir-required';
+    if (input.start.kind === 'evaluation' && !input.evaluationsDir) {
+      return 'evaluations-dir-required';
+    }
     return undefined;
   }
 
@@ -168,8 +189,12 @@ export class ProvenanceService implements IProvenanceService {
     input: ProvenanceTraverseInput,
     derived: DerivedRecord[],
     executions: TransformationExecution[],
+    evaluations: DerivedEvaluation[],
   ): Promise<boolean> {
     const { start } = input;
+    if (start.kind === 'evaluation') {
+      return evaluations.some((row) => row.id === start.id);
+    }
     if (start.kind === 'derived-record') {
       return (await this._recordStore.read(input.outputDir, start.id)) != null;
     }
@@ -270,6 +295,64 @@ export class ProvenanceService implements IProvenanceService {
     reachable: ProvenanceRef[],
     failures: ProvenanceFailure[],
   ): Promise<void> {
+    for (const ref of reachable.filter((item) => item.kind === 'evaluation')) {
+      if (!input.evaluationsDir) continue;
+      const loaded = await this._evaluationStore.read(
+        input.evaluationsDir,
+        ref.id,
+      );
+      if (loaded) {
+        const evaluated = await this._recordStore.read(
+          input.outputDir,
+          loaded.evaluatedRecordId,
+        );
+        if (!evaluated) {
+          const diagnosis = await this._recordStore.diagnose(
+            input.outputDir,
+            loaded.evaluatedRecordId,
+          );
+          failures.push({
+            code:
+              diagnosis === 'invalid'
+                ? 'evaluated-record-invalid'
+                : 'evaluated-record-missing',
+            ref: { kind: 'derived-record', id: loaded.evaluatedRecordId },
+            citedBy: ref,
+          });
+        }
+        if (loaded.suppliedRecordId) {
+          const supplied = await this._recordStore.read(
+            input.outputDir,
+            loaded.suppliedRecordId,
+          );
+          if (!supplied) {
+            const diagnosis = await this._recordStore.diagnose(
+              input.outputDir,
+              loaded.suppliedRecordId,
+            );
+            failures.push({
+              code:
+                diagnosis === 'invalid'
+                  ? 'supplied-record-invalid'
+                  : 'supplied-record-missing',
+              ref: { kind: 'derived-record', id: loaded.suppliedRecordId },
+              citedBy: ref,
+            });
+          }
+        }
+        continue;
+      }
+      const diagnosis = await this._evaluationStore.diagnose(
+        input.evaluationsDir,
+        ref.id,
+      );
+      failures.push({
+        code:
+          diagnosis === 'missing' ? 'evaluation-missing' : 'evaluation-invalid',
+        ref,
+      });
+    }
+
     for (const ref of reachable) {
       if (ref.kind === 'transformation-definition') {
         const loaded = await this._definitionStore.read(
@@ -308,6 +391,19 @@ export class ProvenanceService implements IProvenanceService {
       if (ref.kind === 'derived-record') {
         const loaded = await this._recordStore.read(input.outputDir, ref.id);
         if (loaded) continue;
+        if (
+          failures.some(
+            (item) =>
+              (item.code === 'evaluated-record-missing' ||
+                item.code === 'evaluated-record-invalid' ||
+                item.code === 'supplied-record-missing' ||
+                item.code === 'supplied-record-invalid') &&
+              item.ref.kind === 'derived-record' &&
+              item.ref.id === ref.id,
+          )
+        ) {
+          continue;
+        }
         const diagnosis = await this._recordStore.diagnose(
           input.outputDir,
           ref.id,

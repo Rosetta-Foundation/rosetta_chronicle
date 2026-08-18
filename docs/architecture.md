@@ -100,6 +100,13 @@ committed path on a live xAI invoke (the second of two physical
 specimen invocations; see
 `docs/design/interpretation-policy.md`).
 
+Human evaluation (PRD-0027 E5) is a seventh handler:
+`EvaluateHandler` → `EvaluationService` → `EvaluationStore` plus a
+read of `DerivedRecordStore`. It appends a `DerivedEvaluation` only
+when the evaluated record (and any supplied or preceding cite)
+resolves at write time. It does not mutate the evaluated record or
+invoke a model. See `docs/design/evaluation.md`.
+
 ### Dependency direction
 
 ```
@@ -129,7 +136,8 @@ Defined in `src/types.ts`:
 - **TransformationExecution** — one run of a named recipe; cites `definitionId`.
 - **InterpretationPolicy** — optional recipe fields hashed into definition identity.
 - **ExecutionOccurrence** — one physical provider invocation (not a graph node).
-- **Provenance graph** — in-memory walk over those artifacts (nodes + cites/produces/contains edges).
+- **DerivedEvaluation** — append-only human evaluation of one derived record (not current understanding).
+- **Provenance graph** — in-memory walk over those artifacts (nodes + cites/produces/contains/evaluates edges).
 
 These types are the contract between the source repositories, the synthesis service, and downstream
 consumers.
