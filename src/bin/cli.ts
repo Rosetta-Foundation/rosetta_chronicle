@@ -9,6 +9,7 @@ import {
   getProvenanceHandler,
   getInterpretHandler,
   getEvaluateHandler,
+  getCurrentUnderstandingHandler,
   buildContainer,
 } from '../index';
 import {
@@ -23,6 +24,7 @@ import {
   QueueState,
 } from '../types';
 import { parseProvenanceFrom } from '../utils/provenance-graph.utils';
+import { redactCurrentUnderstandingView } from '../utils/current-understanding.utils';
 import { readFileSync } from 'fs';
 import { describeDropped, ClobberCheck } from '../utils/clobber.utils';
 import {
@@ -49,6 +51,7 @@ import { CHRONICLE_TOKENS } from '../tokens';
  *   chronicle provenance          First-class backward/forward graph walk.
  *   chronicle interpret-source    Machine interpretation with provenance (E4).
  *   chronicle evaluate-derived    Append-only human evaluation of a derived record.
+ *   chronicle current-understanding  Read-only view over interpretation history.
  *
  * Daily Chronicle commands write to the personal Chronicle repo
  * (CHRONICLE_REPO env var or --repo flag) and are idempotent by content hash.
@@ -71,6 +74,7 @@ Usage:
   chronicle provenance --from <kind>:<id> --direction backward|forward --graphs <dir> --output <dir> --executions <dir> --definitions <dir>
   chronicle interpret-source --type candidate-observation --export <path> --graph <file> --source-graph-hash <hex> --conversation-id <id> --node-id <id> --output <dir> --executions <dir> --definitions <dir> --occurrences <dir> --provider <name> --model <id> [--dry-run]
   chronicle evaluate-derived --derived <id> --evaluator-name <name> [--evidence-support supported|not-supported|uncertain] [--personal-recognition recognized|rejected|uncertain] --evaluations <dir> --output <dir> [--dry-run]
+  chronicle current-understanding --output <dir> --evaluations <dir> (--evaluator-name <name> | --perspective all) [--as-of <iso>]
   chronicle queue [show] [--repo <path>]
   chronicle queue add "<title>" [--jira KEY] [--prd NNNN/N] [--due DATE] [--repo <path>]
   chronicle queue done "<title-or-id>" [--repo <path>]
@@ -116,6 +120,13 @@ Commands:
                       required. Default stdout omits evaluation note
                       prose. Does not emit Activity. --dry-run validates
                       only (no writes).
+  current-understanding
+                      Read-only effective event-time view over derived
+                      records and evaluations. Not a memory object.
+                      --as-of T is history-we-have-now about event-time
+                      T, not what Chronicle knew at T. Default stdout
+                      redacts conversation/node ids and prose. Does not
+                      write or invoke a model.
 
 Options:
   --repo <path>       Absolute path to your personal Chronicle repo.
@@ -157,6 +168,11 @@ Options:
                       execution, definition, source-archive,
                       source-conversation, source-node).
   --direction <dir>   backward | forward (chronicle provenance).
+  --perspective all   Aggregate current-understanding across observed
+                      evaluators. Mutually exclusive with
+                      --evaluator-name.
+  --as-of <iso>       Effective event-time cutoff for
+                      current-understanding. Not known-at-T.
   --source-graph-hash <hex>
                       Archive content hash the derived record cites.
   --source-ref <hex>  Alias for --source-graph-hash.
@@ -204,7 +220,8 @@ Environment variables:
                       for provenance.
   CHRONICLE_DERIVED_DIR
                       Default --output for record-derived,
-                      transform-record, evaluate-derived, and provenance.
+                      transform-record, evaluate-derived,
+                      current-understanding, and provenance.
   CHRONICLE_EXECUTION_DIR
                       Default --executions for transform-record,
                       transformation-provenance, and provenance.
@@ -215,8 +232,8 @@ Environment variables:
   CHRONICLE_OCCURRENCE_DIR
                       Default --occurrences for interpret-source.
   CHRONICLE_EVALUATION_DIR
-                      Default --evaluations for evaluate-derived and
-                      provenance.
+                      Default --evaluations for evaluate-derived,
+                      current-understanding, and provenance.
   CHRONICLE_INTERPRET_MODEL_FIXTURE
                       Optional local JSON/text file used as the model
                       body. Wins over a live provider.
@@ -280,6 +297,8 @@ interface ParsedArgs {
   suppliedRecordId?: string;
   precedingEvaluationId?: string;
   evaluatedAt?: string;
+  perspective?: string;
+  asOf?: string;
 }
 
 function parseArgs(argv: string[]): ParsedArgs {
@@ -479,6 +498,12 @@ function parseArgs(argv: string[]): ParsedArgs {
         break;
       case '--evaluated-at':
         result.evaluatedAt = args[++i];
+        break;
+      case '--perspective':
+        result.perspective = args[++i];
+        break;
+      case '--as-of':
+        result.asOf = args[++i];
         break;
       case '-h':
       case '--help':
@@ -1201,6 +1226,42 @@ async function runEvaluateDerived(args: ParsedArgs): Promise<void> {
   }
 }
 
+async function runCurrentUnderstanding(args: ParsedArgs): Promise<void> {
+  if (args.perspective && args.perspective !== 'all') {
+    die('--perspective must be all');
+  }
+  if (Boolean(args.evaluatorName) === Boolean(args.perspective === 'all')) {
+    die(
+      'current-understanding requires exactly one of --evaluator-name or --perspective all',
+    );
+  }
+  const outputDir = args.outputDir ?? process.env['CHRONICLE_DERIVED_DIR'];
+  if (!outputDir) {
+    die(
+      '--output <dir> (or $CHRONICLE_DERIVED_DIR) is required for current-understanding',
+    );
+  }
+  const evaluationsDir =
+    args.evaluationsDir ?? process.env['CHRONICLE_EVALUATION_DIR'];
+  if (!evaluationsDir) {
+    die(
+      '--evaluations <dir> (or $CHRONICLE_EVALUATION_DIR) is required for current-understanding',
+    );
+  }
+  const handler = getCurrentUnderstandingHandler();
+  const result = await handler.handle({
+    outputDir,
+    evaluationsDir,
+    ...(args.evaluatorName ? { evaluatorName: args.evaluatorName } : {}),
+    ...(args.perspective === 'all' ? { perspectiveAll: true } : {}),
+    ...(args.asOf ? { asOf: args.asOf } : {}),
+  });
+  console.log(JSON.stringify(redactCurrentUnderstandingView(result), null, 2));
+  if (result.status === 'invalid' || result.status === 'not-found') {
+    process.exit(1);
+  }
+}
+
 async function main(): Promise<void> {
   const args = parseArgs(process.argv);
 
@@ -1237,6 +1298,9 @@ async function main(): Promise<void> {
       break;
     case 'evaluate-derived':
       await runEvaluateDerived(args);
+      break;
+    case 'current-understanding':
+      await runCurrentUnderstanding(args);
       break;
     default:
       console.error(`chronicle: unknown command '${args.command}'\n`);

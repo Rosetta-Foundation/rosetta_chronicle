@@ -7,7 +7,7 @@ import {
 } from 'fs';
 import path from 'path';
 import { injectable } from 'inversify';
-import { DerivedEvaluation } from '../types';
+import { DerivedEvaluation, StoreInventory } from '../types';
 import { asDerivedEvaluation } from '../utils/evaluation.utils';
 
 /**
@@ -29,6 +29,14 @@ export interface IEvaluationStore {
   ): Promise<EvaluationResolveStatus>;
   write(evaluationsDir: string, evaluation: DerivedEvaluation): Promise<string>;
   list(evaluationsDir: string): Promise<DerivedEvaluation[]>;
+  /**
+   * Enumerate valid evaluations and structurally invalid siblings.
+   * `list` remains the valid-only helper. Current-understanding must
+   * use this so `ok` is not claimed over silent corruption.
+   */
+  listResolved(
+    evaluationsDir: string,
+  ): Promise<StoreInventory<DerivedEvaluation>>;
   pathFor(evaluationsDir: string, id: string): string;
 }
 
@@ -104,6 +112,34 @@ export class EvaluationStore implements IEvaluationStore {
       if (evaluation) found.push(evaluation);
     }
     return found;
+  }
+
+  /** @inheritDoc */
+  async listResolved(
+    evaluationsDir: string,
+  ): Promise<StoreInventory<DerivedEvaluation>> {
+    if (!existsSync(evaluationsDir)) {
+      return { present: false, records: [], failures: [] };
+    }
+    const records: DerivedEvaluation[] = [];
+    const failures: StoreInventory<DerivedEvaluation>['failures'] = [];
+    for (const name of readdirSync(evaluationsDir).sort()) {
+      if (!name.endsWith('.json')) continue;
+      const id = name.slice(0, -'.json'.length);
+      const evaluation = RECORD_ID.test(id)
+        ? await this.read(evaluationsDir, id)
+        : null;
+      if (evaluation) {
+        records.push(evaluation);
+        continue;
+      }
+      failures.push({
+        filename: name,
+        ...(RECORD_ID.test(id) ? { id } : {}),
+        status: 'invalid',
+      });
+    }
+    return { present: true, records, failures };
   }
 
   /** @inheritDoc */

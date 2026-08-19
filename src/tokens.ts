@@ -17,6 +17,7 @@ export const CHRONICLE_TOKENS = {
   ProvenanceHandler: Symbol.for('ProvenanceHandler'),
   InterpretHandler: Symbol.for('InterpretHandler'),
   EvaluateHandler: Symbol.for('EvaluateHandler'),
+  CurrentUnderstandingHandler: Symbol.for('CurrentUnderstandingHandler'),
 
   // Services
   ChronicleService: Symbol.for('ChronicleService'),
@@ -27,6 +28,7 @@ export const CHRONICLE_TOKENS = {
   ProvenanceService: Symbol.for('ProvenanceService'),
   InterpretationService: Symbol.for('InterpretationService'),
   EvaluationService: Symbol.for('EvaluationService'),
+  CurrentUnderstandingService: Symbol.for('CurrentUnderstandingService'),
 
   // Repositories (one per source)
   GitRepository: Symbol.for('GitRepository'),

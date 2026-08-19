@@ -112,6 +112,13 @@ resolves at write time. It does not mutate the evaluated record or
 invoke a model. E5 measured that path against the three E4b machine
 interpretations (see `docs/design/evaluation.md`).
 
+Current understanding (PRD-0027 E6) is an eighth handler:
+`CurrentUnderstandingHandler` → `CurrentUnderstandingService` →
+`DerivedRecordStore.listResolved` + `EvaluationStore.listResolved`.
+It computes a read-only effective event-time view. It does not
+write, invoke a model, or persist a current-understanding artifact.
+See `docs/design/current-understanding.md`.
+
 ### Dependency direction
 
 ```
@@ -142,6 +149,7 @@ Defined in `src/types.ts`:
 - **InterpretationPolicy** — optional recipe fields hashed into definition identity.
 - **ExecutionOccurrence** — one physical provider invocation (not a graph node).
 - **DerivedEvaluation** — append-only human evaluation of one derived record (not current understanding).
+- **CurrentUnderstandingView** — computed present-tense projection over derived records and evaluations (not a durable memory object).
 - **Provenance graph** — in-memory walk over those artifacts (nodes + cites/produces/contains/evaluates edges).
 
 These types are the contract between the source repositories, the synthesis service, and downstream

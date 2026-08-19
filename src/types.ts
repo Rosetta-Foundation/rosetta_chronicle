@@ -877,6 +877,138 @@ export interface EvaluateDerivedResult {
 }
 
 /**
+ * One structurally invalid store file discovered by `listResolved`.
+ * Silent `list()` omission is not enough for current-understanding
+ * integrity: an unreferenced corrupt sibling must be observable.
+ */
+export interface StoreInventoryFailure {
+  filename: string;
+  id?: string;
+  status: 'invalid';
+}
+
+/**
+ * Diagnostic enumeration of a content-addressed JSON store.
+ * `present` is false when the directory itself is missing.
+ */
+export interface StoreInventory<T> {
+  present: boolean;
+  records: T[];
+  failures: StoreInventoryFailure[];
+}
+
+// ─── Current understanding (E6 computed view) ────────────────────────────────
+
+/**
+ * Historical provenance class of a derived record. Independent of
+ * later evaluation. A machine interpretation that a human later
+ * recognizes remains `machine-interpretation`.
+ */
+export type InterpretationKind =
+  | 'machine-interpretation'
+  | 'human-interpretation'
+  | 'insufficient-evidence'
+  | 'unclassified';
+
+export type EvidenceState =
+  | 'unassessed'
+  | 'supported'
+  | 'not-supported'
+  | 'uncertain'
+  | 'conflict';
+
+export type RecognitionState =
+  | 'unassessed'
+  | 'recognized'
+  | 'rejected'
+  | 'uncertain'
+  | 'conflict';
+
+export type CurrentUnderstandingStatus =
+  | 'ok'
+  | 'partial'
+  | 'not-found'
+  | 'invalid';
+
+export type CurrentUnderstandingPerspective =
+  | { kind: 'evaluator'; name: string }
+  | { kind: 'all' };
+
+/**
+ * Reduced state for one observed evaluator on one interpretation.
+ * Required on entries when perspective is `all`.
+ */
+export interface EvaluatorProjection {
+  evaluator: EvaluationActor;
+  evidenceState: EvidenceState;
+  recognitionState: RecognitionState;
+  contributingEvaluationIds: string[];
+}
+
+export interface CurrentUnderstandingFlag {
+  code: string;
+  derivedRecordIds: string[];
+  evaluationIds: string[];
+  dimension?: 'evidenceSupport' | 'personalRecognition';
+}
+
+export interface CurrentUnderstandingFailure {
+  code: string;
+  ref?: { kind: string; id?: string };
+}
+
+export interface CurrentUnderstandingExplanation {
+  evaluatedRecordId: string;
+  evaluationIds: string[];
+  executionId?: string;
+  /** Full refs in the service model. Default CLI redacts node/conversation ids. */
+  sourceRefs: Array<{
+    sourceGraphHash: string;
+    conversationId?: string;
+    nodeIds?: string[];
+  }>;
+}
+
+export interface CurrentUnderstandingEntry {
+  derivedRecordId: string;
+  kind: InterpretationKind;
+  currentEvidenceState: EvidenceState;
+  currentRecognitionState: RecognitionState;
+  contributingEvaluationIds: string[];
+  candidateSuccessorIds: string[];
+  perspectiveStates?: EvaluatorProjection[];
+  explanation: CurrentUnderstandingExplanation;
+}
+
+/**
+ * Read-only projection over immutable interpretation and evaluation
+ * history. Not a durable memory object. `asOfSemantics` is effective
+ * event-time over history currently available, not known-at-T.
+ */
+export interface CurrentUnderstandingView {
+  status: CurrentUnderstandingStatus;
+  asOf: string;
+  generatedAt: string;
+  asOfSemantics: 'effective-event-time';
+  perspective: CurrentUnderstandingPerspective;
+  policy: { id: 'current-understanding'; version: '1' };
+  entries: CurrentUnderstandingEntry[];
+  unresolved: CurrentUnderstandingFlag[];
+  conflicts: CurrentUnderstandingFlag[];
+  failures: CurrentUnderstandingFailure[];
+}
+
+/** Input to current-understanding. Exactly one perspective form. */
+export interface CurrentUnderstandingInput {
+  outputDir: string;
+  evaluationsDir: string;
+  evaluatorName?: string;
+  perspectiveAll?: boolean;
+  asOf?: string;
+  generatedAt?: string;
+}
+
+/**
  * Provenance query. Exactly one of derived / execution / source /
  * definition / compare is set by the CLI.
  */

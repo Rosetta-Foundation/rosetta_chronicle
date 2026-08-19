@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, rmSync } from 'fs';
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import path from 'path';
 import { DerivedRecordStore } from '../repositories/derived-record-store.repository';
@@ -44,5 +44,22 @@ describe('DerivedRecordStore', () => {
     const listed = await store.list(outputDir);
     expect(listed).toHaveLength(1);
     expect(listed[0].id).toBe(ID);
+  });
+
+  it('listResolved reports a corrupt sibling that list omits', async () => {
+    const store = new DerivedRecordStore();
+    await store.write(outputDir, record());
+    writeFileSync(path.join(outputDir, `${'e'.repeat(64)}.json`), '{not-json');
+    expect(await store.list(outputDir)).toHaveLength(1);
+    const resolved = await store.listResolved(outputDir);
+    expect(resolved.present).toBe(true);
+    expect(resolved.records).toHaveLength(1);
+    expect(resolved.failures).toEqual([
+      {
+        filename: `${'e'.repeat(64)}.json`,
+        id: 'e'.repeat(64),
+        status: 'invalid',
+      },
+    ]);
   });
 });

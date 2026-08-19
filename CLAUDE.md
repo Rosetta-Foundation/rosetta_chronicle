@@ -43,6 +43,7 @@ src/
 ├── transformation.handler.ts    ITransformationHandler (PRD-0027 executions / definitions)
 ├── provenance.handler.ts        IProvenanceHandler (PRD-0027 graph traversal)
 ├── interpret.handler.ts         IInterpretHandler (PRD-0027 E4a machine interpretation)
+├── current-understanding.handler.ts ICurrentUnderstandingHandler (PRD-0027 E6)
 ├── services/
 │   └── chronicle.service.ts     IChronicleService — synthesize sources → DailyChronicle
 ├── repositories/                one per source (interface + stub impl)

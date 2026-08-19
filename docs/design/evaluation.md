@@ -14,7 +14,8 @@ INTERPRETATION         what someone made of it
     ↓
 EVALUATION             what someone later thought about that interpretation
     ↓
-CURRENT UNDERSTANDING  a future VIEW over those histories — not this phase
+CURRENT UNDERSTANDING  a computed VIEW over those histories
+                       (see `docs/design/current-understanding.md`)
 ```
 
 An evaluation is a historical act, not timeless truth. A later
