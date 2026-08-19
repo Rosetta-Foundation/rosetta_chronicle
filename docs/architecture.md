@@ -119,9 +119,9 @@ It computes a read-only effective event-time view. It does not
 write, invoke a model, or persist a current-understanding artifact.
 E6 measured that view against the E5 evaluations of the three E4b
 machine interpretations (see `docs/design/current-understanding.md`).
-E7 measured a longitudinal recognition revision on that same
-machinery, plus a separately labeled adversarial equal-time
-projection probe — not a ninth handler
+E7 measured constructed sequential and equal-time projection
+probes on that same machinery (genuine longitudinal revision not
+yet observed) — not a ninth handler
 (`docs/design/revision-experiment.md`).
 
 ### Dependency direction

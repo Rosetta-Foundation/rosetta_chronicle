@@ -1,6 +1,7 @@
 # Design — Longitudinal revision experiment (E7)
 
-**Status:** Procedure measured locally (2026-08-19). Not a new engine layer.
+**Status:** Procedure measured locally (2026-08-19). Genuine Track A
+revision not yet observed. Not a new engine layer.
 **Date:** 2026-08-19
 **Depends on:** E5 (`docs/design/evaluation.md`), E6 measured
 (`docs/design/current-understanding.md`)
@@ -102,58 +103,71 @@ chronicle current-understanding
 
 against the existing private E4b/E5 store.
 
-### Primary shape (one dimension)
+### Track A — genuine longitudinal revision
 
 Prefer **recognition**, because E5 already set evidence to
-`supported` and left recognition unassessed. Revising recognition
-does not require retracting the E5 evidence acts.
+`supported` and left recognition unassessed.
 
-Pick **one** of the three existing machine interpretations. Do not
-revise all three unless the first case is green.
+`recognized → rejected` is an **illustrative target shape**, not an
+instruction to manufacture a human revision. Do not assign those
+values to make the experiment green.
+
+Record the operator's **genuine** evaluation at each **real event
+time**. Do not invent `evaluatedAt`. Do not reuse the E5 timestamp.
+Do not mutate T1 or the E5 evaluation.
 
 ```text
 T1  interpretation X exists (E4b; unreviewed)
     E5 evidenceSupport = supported remains in history
 
-T2  new DerivedEvaluation (same evaluator, later evaluatedAt):
-    personalRecognition = recognized
-    (evidenceSupport omitted)
+T2  exists only if the operator genuinely evaluates X
+    at a real event time (evidenceSupport omitted unless
+    they are also judging evidence)
 
-T3  another DerivedEvaluation (still later evaluatedAt):
-    personalRecognition = rejected
-    (evidenceSupport omitted)
+T3  exists only if the operator later genuinely revises
+    that same interpretation at a later real event time
 ```
 
-Use real event times of the human judgments. Do not invent
-`evaluatedAt`. Do not reuse the E5 timestamp. Do not mutate T1 or
-the E5 evaluation.
+If no genuine T2 occurs in the experiment window: report
+**longitudinal revision not yet observed** (and T2 absent).
 
-Optional: set `precedingEvaluationId` from T3 → T2 (or T2 → E5)
-as “responds to.” Reduction must still ignore it.
+If T2 occurs and no genuine T3 occurs: report T2 only; do not
+invent a T3.
 
-### Required observations (sanitized)
+Omit `evidenceSupport` on recognition-only acts so the E5
+`supported` judgment remains an independent dimension.
 
-Snapshot derived and evaluation stores before T2, after T2, after
-T3.
+Optional: `precedingEvaluationId` as “responds to.” Reduction still
+ignores it.
+
+If a genuine T2 then T3 of the illustrative shape is observed,
+the expected projection is:
 
 | Query | Expected |
 | ----- | -------- |
 | `--as-of` E5 time | evidence `supported`; recognition `unassessed`; kind `machine-interpretation` |
-| `--as-of T2` | recognition `recognized`; E5 evidence still `supported`; kind unchanged |
-| `--as-of T3` | recognition `rejected`; E5 evidence still `supported`; kind unchanged |
-| `--as-of T3` history | `explanation.evaluationIds` includes E5 + T2 + T3 (in-scope acts for that record/perspective) |
-| `--as-of T3` current recognition contributors | T3 only |
-| `--as-of T2` current recognition contributors | T2 only |
+| `--as-of T2` | recognition as genuinely recorded at T2; E5 evidence still `supported`; kind unchanged |
+| `--as-of T3` | recognition as genuinely recorded at T3; E5 evidence still `supported`; kind unchanged |
+| `--as-of T3` history | in-scope E5 + T2 + T3 |
+| `--as-of T3` current recognition contributors | T3 act(s) only (union with current evidence contributors on the entry) |
 | DerivedRecord X | byte-identical to pre-E7; `reviewState` still `unreviewed` |
 | E5 evaluation | byte-identical |
 | T2 evaluation after T3 | still present, byte-identical |
 
-No “latest value” written anywhere. No current-understanding
-artifact. No model call.
+No “latest value” field. No current-understanding artifact. No
+model call.
 
-Label this track **longitudinal revision** in the sanitized report
-and in any later checkpoint. It is the E7 revision-provenance
-experiment.
+Label this track **A. Real human longitudinal revision**.
+
+### Constructed longitudinal projection probe (optional, separate)
+
+If an immediate sequential reduction test with **deliberately
+assigned** values is wanted (for example assigned `recognized`
+then `rejected`), that is **not** Track A.
+
+Label it **constructed longitudinal projection probe**. It may use
+assigned values and persist event times. It must not be reported as
+the operator changing their mind.
 
 ### Adversarial projection probe (equal-time pair)
 
@@ -202,23 +216,30 @@ discipline as E6.
 Same privacy floor as E5/E6: no statements, source text,
 conversation/node ids, artifact ids, titles, filenames, or notes.
 
-Include: engine revision; **separate** histograms and
-contributor/history splits for (1) longitudinal revision and
-(2) adversarial projection probe; as-of times; conflict codes;
-snapshot hashes-unchanged for T1 and E5; confirmation of no
-provider path. Do not present the probe as a human revision.
+Include: engine revision; **separate** results for
+(A) genuine longitudinal revision, (constructed sequential probe,
+if any), and (B) equal-time adversarial probe; as-of times;
+conflict codes; snapshot hashes-unchanged for T1 and E5;
+confirmation of no provider path. If Track A has no genuine T2/T3,
+say **longitudinal revision not yet observed**. Do not present
+either probe as a human revision.
 
-### Proven / not proven (after a green private run)
+### Proven / not proven (after a private run)
 
-**Would prove (longitudinal revision)**
+**Would prove (A, only if a genuine T2 then T3 occurred)**
 
-- One experimental human revision is representable as two immutable
+- One real human revision is representable as two immutable
   evaluations
 - Current understanding at T2 and T3 can be reconstructed from
   history without a latest-value field
 - Transitions remain inspectable (T2 still exists after T3)
 
-**Would prove (adversarial projection probe only)**
+**Would prove (constructed sequential probe only)**
+
+- Assigned sequential values reduce the same way as the
+  illustrative shape, without claiming a real change of mind
+
+**Would prove (B, adversarial equal-time probe only)**
 
 - Equal-time contradictory evaluations surface as `conflict`
   rather than a silent winner
@@ -229,6 +250,7 @@ provider path. Do not present the probe as a human revision.
 
 - The Revision Provenance Hypothesis in general
 - That a human actually held two simultaneous recognitions
+- That assigned probe values were genuine operator judgments
 - Multi-evaluator disagreement in real use
 - Evidence and recognition revised together
 - Corrections (`suppliedRecordId`)
@@ -263,16 +285,32 @@ an E7 handler.
 ## E7 — measured local experiment (2026-08-19)
 
 Ran after #25 merged, on the existing private E4b/E5 store, engine
-`a54f695`. No new schema. No provider. Two tracks, labeled separately.
+`a54f695`. No new schema. No provider. This checkpoint did not call
+`evaluate-derived`. Queries left the store byte-identical (22 files;
+derived × 3, evaluations × 7).
 
-Private source text, observation text, ids, titles, filenames, and
-notes are not in this repository.
+Private source text, observation text, ids, titles, filenames,
+notes, and evaluation prose are not in this repository.
 
-### Track A — longitudinal revision
+### A. Real human longitudinal revision
 
-One of the three machine interpretations. Two new append-only
-evaluations by `operator` on `personalRecognition` only, at persist
-event time (`T2 < T3`; not backdated). E5 evidence acts untouched.
+**Longitudinal revision not yet observed.**
+
+No operator-supplied genuine event times or genuine recognition
+values were recorded in the experiment window. Assigned sequential
+values are not Track A. T2/T3 of a real change of mind are absent.
+
+### Constructed longitudinal projection probe
+
+**Not a real human revision.** Assigned sequential
+`personalRecognition` values (`recognized` then `rejected`) already
+existed on one of the three records from an earlier private write
+(append-only; not deleted). `evidenceSupport` omitted on both acts.
+Persist event times, `T2 < T3`. A different record than the
+equal-time probe. E5 evidence acts untouched.
+
+This is an immediate sequential reduction test with deliberately
+assigned values, not a claim that the operator changed their mind.
 
 | `asOf` | Kind | Evidence | Recognition |
 | --- | --- | --- | --- |
@@ -282,60 +320,78 @@ event time (`T2 < T3`; not backdated). E5 evidence acts untouched.
 
 At T3: `explanation.evaluationIds` count = 3 (E5 + T2 + T3). Current
 entry contributors = E5 evidence act + T3 recognition act. T2 remains
-in history and is not a current contributor. Derived record
-byte-identical, `reviewState` still `unreviewed`. E5 evaluation files
-byte-identical.
+in history, is reconstructable at `--as-of T2`, and is not a current
+contributor at T3. Derived records `reviewState` still `unreviewed`.
+No latest-value / current-state artifact.
 
-### Track B — adversarial projection probe
+### B. Intentionally constructed adversarial conflict probe
 
 **Not a real human revision event.** Constructed equal-`evaluatedAt`
-pair on a **different** record: `recognized` and `rejected`.
+pair on a **different** record: `recognized` and `rejected`. Not a
+claim that the human performed two contradictory recognition acts
+at the same event time.
 
 | `asOf` | Recognition | Evidence | Kind |
 | --- | --- | --- | --- |
 | before probe | `unassessed` | `supported` | `machine-interpretation` |
 | probe timestamp | `conflict` (`same-evaluator-tie`) | `supported` | `machine-interpretation` |
 
-Both probe acts are current recognition contributors. E5 remains in
-history and is not the sole current contributor.
+Both tied acts are current recognition contributors. E5 remains in
+history (history count 3) and is a current evidence contributor, not
+a recognition contributor. Kind unchanged.
 
 ### Control
 
-The third record was not given T2/T3 or a probe. At T3 it stayed
+The third record has only its E5 evidence act. At T3 it stayed
 evidence `supported`, recognition `unassessed`, history count 1.
 
 ### Whole-view histograms (sanitized)
 
-At T3 (Track A visible, probe not yet in as-of): recognition
-`rejected` × 1, `unassessed` × 2; conflicts none.
+At constructed-probe T3 (equal-time probe not yet in as-of):
+recognition `rejected` × 1, `unassessed` × 2; conflicts none.
 
-At probe time: recognition `rejected` × 1, `conflict` × 1,
-`unassessed` × 1; conflict code `same-evaluator-tie` × 1.
+At equal-time probe timestamp: recognition `rejected` × 1,
+`conflict` × 1, `unassessed` × 1; conflict code `same-evaluator-tie`
+× 1. Kind `machine-interpretation` × 3; evidence `supported` × 3.
 
-New evaluation artifacts: 4 (T2, T3, probe recognized, probe
-rejected). Dry-run wrote nothing. Queries wrote nothing. CLI
-redaction passed. Kind `machine-interpretation` × 3 throughout.
+Existing evaluation artifacts: 7 (3 E5 + 2 constructed sequential +
+2 equal-time). This checkpoint wrote none. Dry-run was not repeated.
+Queries wrote nothing. CLI redaction passed. Provider path not
+invoked.
 
 ### Proven
 
-**Longitudinal revision**
+**A. Real human longitudinal revision**
 
-- One experimental human revision is representable as two immutable
-  evaluations
-- `--as-of T2` and `--as-of T3` reconstruct both states without a
-  latest-value field
-- T2 still exists after T3
+- Nothing in this window. Report: longitudinal revision not yet
+  observed.
 
-**Adversarial projection probe only**
+**Constructed longitudinal projection probe only**
 
-- Equal-time contradictory evaluations surface as `conflict`
-- Non-winning history is not treated as a current recognition
-  contributor
+- Assigned sequential `recognized` → `rejected` reduces as the
+  illustrative shape: E5 → recognition `unassessed`; T2 →
+  `recognized`; T3 → `rejected`; evidence remains `supported`; kind
+  remains `machine-interpretation`
+- `--as-of T2` and `--as-of T3` reconstruct both projected states
+  without a latest-value field
+- T2 remains immutable and historically reconstructable after T3
+- T3 alone is the current recognition contributor at T3
+- History includes the applicable E5/T2/T3 acts
+
+**B. Adversarial projection probe only**
+
+- Equal-time contradictory evaluations surface as `conflict` /
+  `same-evaluator-tie` rather than a silent winner
+- Both tied acts are current recognition contributors
+- Earlier (E5) history remains reconstructable
 
 ### Not proven
 
-- The Revision Provenance Hypothesis in general
+- A genuine operator revision of an interpretation
+- The Revision Provenance Hypothesis in general (remains
+  **Speculative**)
 - That a human actually held two simultaneous recognitions
+- That assigned probe values were genuine operator judgments
 - Multi-evaluator disagreement in real use
 - Evidence and recognition revised together
 - Corrections (`suppliedRecordId`)
@@ -343,4 +399,5 @@ redaction passed. Kind `machine-interpretation` × 3 throughout.
 - Biography / profile
 - That changing one's mind is “correct”
 
-Do not start E8.
+Do not start E8. Do not infer broader claims from one successful
+constructed projection.
