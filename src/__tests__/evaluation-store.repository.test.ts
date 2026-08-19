@@ -147,4 +147,28 @@ describe('EvaluationStore', () => {
     expect(await store.read(dir, record.id)).toBeNull();
     expect(await store.diagnose(dir, record.id)).toBe('invalid');
   });
+
+  it('listResolved reports a corrupt sibling that list omits', async () => {
+    const store = new EvaluationStore();
+    const record = evaluation();
+    await store.write(dir, record);
+    writeFileSync(join(dir, `${'c'.repeat(64)}.json`), '{not-json');
+    expect(await store.list(dir)).toHaveLength(1);
+    const resolved = await store.listResolved(dir);
+    expect(resolved.present).toBe(true);
+    expect(resolved.records).toHaveLength(1);
+    expect(resolved.failures).toEqual([
+      {
+        filename: `${'c'.repeat(64)}.json`,
+        id: 'c'.repeat(64),
+        status: 'invalid',
+      },
+    ]);
+  });
+
+  it('listResolved marks a missing directory as not present', async () => {
+    const store = new EvaluationStore();
+    const resolved = await store.listResolved(join(dir, 'no-such-dir'));
+    expect(resolved).toEqual({ present: false, records: [], failures: [] });
+  });
 });

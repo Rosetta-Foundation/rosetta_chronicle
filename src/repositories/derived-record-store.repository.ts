@@ -7,7 +7,7 @@ import {
 } from 'fs';
 import path from 'path';
 import { injectable } from 'inversify';
-import { DerivedRecord } from '../types';
+import { DerivedRecord, StoreInventory } from '../types';
 
 /**
  * Persistence adapter for a provenance-preserving derived record.
@@ -23,6 +23,12 @@ export interface IDerivedRecordStore {
   diagnose(outputDir: string, id: string): Promise<DerivedResolveStatus>;
   write(outputDir: string, record: DerivedRecord): Promise<string>;
   list(outputDir: string): Promise<DerivedRecord[]>;
+  /**
+   * Enumerate valid derived records and structurally invalid siblings.
+   * `list` remains the valid-only helper. Current-understanding must
+   * use this so `ok` is not claimed over silent corruption.
+   */
+  listResolved(outputDir: string): Promise<StoreInventory<DerivedRecord>>;
   pathFor(outputDir: string, id: string): string;
 }
 
@@ -91,6 +97,34 @@ export class DerivedRecordStore implements IDerivedRecordStore {
       if (record) found.push(record);
     }
     return found;
+  }
+
+  /** @inheritDoc */
+  async listResolved(
+    outputDir: string,
+  ): Promise<StoreInventory<DerivedRecord>> {
+    if (!existsSync(outputDir)) {
+      return { present: false, records: [], failures: [] };
+    }
+    const records: DerivedRecord[] = [];
+    const failures: StoreInventory<DerivedRecord>['failures'] = [];
+    for (const name of readdirSync(outputDir).sort()) {
+      if (!name.endsWith('.json')) continue;
+      const id = name.slice(0, -'.json'.length);
+      const record = RECORD_ID.test(id)
+        ? await this.read(outputDir, id)
+        : null;
+      if (record) {
+        records.push(record);
+        continue;
+      }
+      failures.push({
+        filename: name,
+        ...(RECORD_ID.test(id) ? { id } : {}),
+        status: 'invalid',
+      });
+    }
+    return { present: true, records, failures };
   }
 
   /** @inheritDoc */

@@ -129,7 +129,10 @@ Implemented:
   result in `docs/design/interpretation-policy.md`; private source
   and observations are not in this repository)
 - append-only human evaluation of a derived record
-  (`evaluate-derived`; not current understanding, not Activity)
+  (`evaluate-derived`; not biography, not Activity)
+- read-only current-understanding view
+  (`current-understanding`; computed, not a durable artifact;
+  `docs/design/current-understanding.md`)
 - E5 measured locally (three append-only human evaluations of the
   three E4b machine interpretations: `evidenceSupport = supported`
   × 3, `personalRecognition` omitted; machine records remained
@@ -149,7 +152,7 @@ Not implemented:
   or a local inference adapter (backlog:
   `docs/design/local-model-adapter.md`; not E6)
 - bulk conversation scan
-- current-understanding view, biography, or profile materialization
+- biography, profile, or materialized current-understanding artifact
 - general model reliability, multimodal coverage, or biography
 
 ---
@@ -204,7 +207,8 @@ Include:
 - read-only versus mutating behavior
 - failure behavior
 
-Keep inventory, import, interpret-source, and evaluate-derived separate.
+Keep inventory, import, interpret-source, evaluate-derived, and
+current-understanding separate.
 
 ---
 

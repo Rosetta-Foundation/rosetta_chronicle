@@ -31,6 +31,10 @@ import {
 } from './interpret.handler';
 import { IEvaluateHandler, EvaluateHandler } from './evaluate.handler';
 import {
+  ICurrentUnderstandingHandler,
+  CurrentUnderstandingHandler,
+} from './current-understanding.handler';
+import {
   IChronicleService,
   ChronicleService,
 } from './services/chronicle.service';
@@ -62,6 +66,10 @@ import {
   IEvaluationService,
   EvaluationService,
 } from './services/evaluation.service';
+import {
+  ICurrentUnderstandingService,
+  CurrentUnderstandingService,
+} from './services/current-understanding.service';
 import { IGitRepository, GitRepository } from './repositories/git.repository';
 import {
   IGitDiscoveryRepository,
@@ -237,6 +245,11 @@ export const buildContainer = (): Container => {
   container
     .bind<IEvaluationService>(CHRONICLE_TOKENS.EvaluationService)
     .to(EvaluationService);
+  container
+    .bind<ICurrentUnderstandingService>(
+      CHRONICLE_TOKENS.CurrentUnderstandingService,
+    )
+    .to(CurrentUnderstandingService);
 
   // Handlers
   container
@@ -263,6 +276,11 @@ export const buildContainer = (): Container => {
   container
     .bind<IEvaluateHandler>(CHRONICLE_TOKENS.EvaluateHandler)
     .to(EvaluateHandler);
+  container
+    .bind<ICurrentUnderstandingHandler>(
+      CHRONICLE_TOKENS.CurrentUnderstandingHandler,
+    )
+    .to(CurrentUnderstandingHandler);
 
   return container;
 };
@@ -322,3 +340,11 @@ export const getEvaluateHandler = (): IEvaluateHandler => {
     CHRONICLE_TOKENS.EvaluateHandler,
   );
 };
+
+/** Resolve the current-understanding handler from a fresh container. */
+export const getCurrentUnderstandingHandler =
+  (): ICurrentUnderstandingHandler => {
+    return buildContainer().get<ICurrentUnderstandingHandler>(
+      CHRONICLE_TOKENS.CurrentUnderstandingHandler,
+    );
+  };

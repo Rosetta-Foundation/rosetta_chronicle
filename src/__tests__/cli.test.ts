@@ -48,6 +48,7 @@ describe('chronicle CLI', () => {
     expect(result.stdout).toContain('provenance');
     expect(result.stdout).toContain('interpret-source');
     expect(result.stdout).toContain('evaluate-derived');
+    expect(result.stdout).toContain('current-understanding');
   });
 
   it('inventory-chatgpt exits 1 without --export', () => {
@@ -412,6 +413,76 @@ describe('chronicle CLI', () => {
       rmSync(execs, { recursive: true, force: true });
       rmSync(defs, { recursive: true, force: true });
       rmSync(occs, { recursive: true, force: true });
+    }
+  });
+
+  it('current-understanding exits 1 without a perspective', () => {
+    const result = spawnSync(
+      process.execPath,
+      [CLI, 'current-understanding', '--output', '/tmp', '--evaluations', '/tmp'],
+      { encoding: 'utf-8' },
+    );
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('--evaluator-name');
+  });
+
+  it('current-understanding redacts source identifiers and writes nothing', () => {
+    const derivedDir = mkdtempSync(join(tmpdir(), 'cli-cu-derived-'));
+    const evalDir = mkdtempSync(join(tmpdir(), 'cli-cu-eval-'));
+    try {
+      const recorded = spawnSync(
+        process.execPath,
+        [
+          CLI,
+          'record-derived',
+          '--output',
+          derivedDir,
+          '--source-graph-hash',
+          'a'.repeat(64),
+          '--conversation-id',
+          'conv-1',
+          '--node-id',
+          'n1',
+          '--type',
+          'human-note',
+          '--producer-type',
+          'human',
+          '--producer-name',
+          'fixture',
+          '--content',
+          'SYNTHETIC_DERIVED_NOTE',
+        ],
+        { encoding: 'utf-8' },
+      );
+      expect(recorded.status).toBe(0);
+      const beforeDerived = readdirSync(derivedDir).sort();
+      const beforeEval = readdirSync(evalDir).sort();
+      const result = spawnSync(
+        process.execPath,
+        [
+          CLI,
+          'current-understanding',
+          '--output',
+          derivedDir,
+          '--evaluations',
+          evalDir,
+          '--evaluator-name',
+          'operator',
+          '--as-of',
+          '2026-08-18T21:18:00.000Z',
+        ],
+        { encoding: 'utf-8' },
+      );
+      expect(result.status).toBe(0);
+      expect(result.stdout).not.toContain('conv-1');
+      expect(result.stdout).not.toContain('n1');
+      expect(result.stdout).not.toContain('SYNTHETIC_DERIVED_NOTE');
+      expect(result.stdout).toContain('human-interpretation');
+      expect(readdirSync(derivedDir).sort()).toEqual(beforeDerived);
+      expect(readdirSync(evalDir).sort()).toEqual(beforeEval);
+    } finally {
+      rmSync(derivedDir, { recursive: true, force: true });
+      rmSync(evalDir, { recursive: true, force: true });
     }
   });
 
