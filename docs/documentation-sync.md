@@ -144,6 +144,10 @@ Implemented:
   recognition `unassessed` × 3; view changed across event-time
   `asOf` without mutating stores; no provider invoke; sanitized
   result in `docs/design/current-understanding.md`)
+- E7 measured locally (longitudinal recognition revision on one
+  E4b record, T2 `recognized` → T3 `rejected`; separate adversarial
+  equal-time probe on another record → `conflict`; no new schema;
+  sanitized result in `docs/design/revision-experiment.md`)
 
 Not implemented:
 
@@ -158,8 +162,8 @@ Not implemented:
   `docs/design/local-model-adapter.md`; not E6)
 - bulk conversation scan
 - biography, profile, or materialized current-understanding artifact
-- a new E7 schema or handler (longitudinal revision is a private
-  experiment on existing E5/E6 machinery;
+- a new E7 schema or handler (E7 was a private experiment on
+  existing E5/E6 machinery;
   `docs/design/revision-experiment.md`)
 - general model reliability, multimodal coverage, or biography
 

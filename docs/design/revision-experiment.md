@@ -1,6 +1,6 @@
 # Design — Longitudinal revision experiment (E7)
 
-**Status:** Design / procedure only. Not a new engine layer.
+**Status:** Procedure measured locally (2026-08-19). Not a new engine layer.
 **Date:** 2026-08-19
 **Depends on:** E5 (`docs/design/evaluation.md`), E6 measured
 (`docs/design/current-understanding.md`)
@@ -260,7 +260,87 @@ an E7 handler.
 - E8
 - Adding tests or schemas solely so E7 “has a phase”
 
-## Stop
+## E7 — measured local experiment (2026-08-19)
 
-This file is the procedure. Do not run the private experiment from
-this document until a human asks to run E7.
+Ran after #25 merged, on the existing private E4b/E5 store, engine
+`a54f695`. No new schema. No provider. Two tracks, labeled separately.
+
+Private source text, observation text, ids, titles, filenames, and
+notes are not in this repository.
+
+### Track A — longitudinal revision
+
+One of the three machine interpretations. Two new append-only
+evaluations by `operator` on `personalRecognition` only, at persist
+event time (`T2 < T3`; not backdated). E5 evidence acts untouched.
+
+| `asOf` | Kind | Evidence | Recognition |
+| --- | --- | --- | --- |
+| E5 time | `machine-interpretation` | `supported` | `unassessed` |
+| T2 | `machine-interpretation` | `supported` | `recognized` |
+| T3 | `machine-interpretation` | `supported` | `rejected` |
+
+At T3: `explanation.evaluationIds` count = 3 (E5 + T2 + T3). Current
+entry contributors = E5 evidence act + T3 recognition act. T2 remains
+in history and is not a current contributor. Derived record
+byte-identical, `reviewState` still `unreviewed`. E5 evaluation files
+byte-identical.
+
+### Track B — adversarial projection probe
+
+**Not a real human revision event.** Constructed equal-`evaluatedAt`
+pair on a **different** record: `recognized` and `rejected`.
+
+| `asOf` | Recognition | Evidence | Kind |
+| --- | --- | --- | --- |
+| before probe | `unassessed` | `supported` | `machine-interpretation` |
+| probe timestamp | `conflict` (`same-evaluator-tie`) | `supported` | `machine-interpretation` |
+
+Both probe acts are current recognition contributors. E5 remains in
+history and is not the sole current contributor.
+
+### Control
+
+The third record was not given T2/T3 or a probe. At T3 it stayed
+evidence `supported`, recognition `unassessed`, history count 1.
+
+### Whole-view histograms (sanitized)
+
+At T3 (Track A visible, probe not yet in as-of): recognition
+`rejected` × 1, `unassessed` × 2; conflicts none.
+
+At probe time: recognition `rejected` × 1, `conflict` × 1,
+`unassessed` × 1; conflict code `same-evaluator-tie` × 1.
+
+New evaluation artifacts: 4 (T2, T3, probe recognized, probe
+rejected). Dry-run wrote nothing. Queries wrote nothing. CLI
+redaction passed. Kind `machine-interpretation` × 3 throughout.
+
+### Proven
+
+**Longitudinal revision**
+
+- One experimental human revision is representable as two immutable
+  evaluations
+- `--as-of T2` and `--as-of T3` reconstruct both states without a
+  latest-value field
+- T2 still exists after T3
+
+**Adversarial projection probe only**
+
+- Equal-time contradictory evaluations surface as `conflict`
+- Non-winning history is not treated as a current recognition
+  contributor
+
+### Not proven
+
+- The Revision Provenance Hypothesis in general
+- That a human actually held two simultaneous recognitions
+- Multi-evaluator disagreement in real use
+- Evidence and recognition revised together
+- Corrections (`suppliedRecordId`)
+- Known-at-time semantics
+- Biography / profile
+- That changing one's mind is “correct”
+
+Do not start E8.

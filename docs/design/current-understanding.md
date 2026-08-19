@@ -220,8 +220,10 @@ A one-step evidence-support evaluation of three committed
 interpretations is not a claim that Chronicle has represented a
 human changing their mind.
 
-Longitudinal revision is the next experiment. It does **not** add a
-layer. See `docs/design/revision-experiment.md`.
+Longitudinal revision was measured as E7 on this same view. The
+equal-time conflict case in that experiment is an adversarial
+projection probe, not a real human revision event. See
+`docs/design/revision-experiment.md`.
 
 ## Out of scope
 
