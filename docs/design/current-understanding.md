@@ -2,6 +2,7 @@
 
 **Status:** Implemented read-only computed view. Not a memory object.
 **Date:** 2026-08-18
+**Measured:** private E6 smoke, 2026-08-19 (`05ef7ba`)
 
 Current understanding is a present-tense **projection** over
 immutable interpretation and evaluation history.
@@ -112,14 +113,125 @@ CurrentUnderstandingHandler
 
 No new repository class. No service-to-service calls.
 
+## E6 — measured local experiment (2026-08-19)
+
+E6 asked whether the real E5 history projects through a read-only
+current-understanding view without mutation, without collapsing
+evidence support into personal recognition, and without implying
+current personal belief.
+
+It is a measurement of the existing view, not a product claim and
+not a biography.
+
+The private smoke used the three E4b machine `candidate-observation`
+records and the three E5 human evaluations (`evidenceSupport =
+supported`, `personalRecognition` omitted). Private source text,
+observation text, ids, conversation titles, filenames, and
+evaluation prose are not in this repository.
+
+No provider or model invocation. No writes.
+
+### Sanitized result
+
+| Field | Measured |
+| --- | --- |
+| Engine revision | `05ef7ba` (#23) |
+| Perspective | named `operator` |
+| Primary `asOf` | E5 event time (`2026-08-18T21:18:00.000Z`) |
+| Policy | `current-understanding` version `1` |
+| `asOfSemantics` | `effective-event-time` |
+| Status | `ok` |
+| Entries | 3 |
+| Kind | `machine-interpretation` × 3 |
+| Evidence | `supported` × 3 |
+| Recognition | `unassessed` × 3 |
+| Conflicts | none |
+| Unresolved | `recognition-unassessed` × 3 |
+| Contributor / history split | current evidence contributor = the single in-scope E5 act; history count = 1 × 3 |
+| Internal exact provenance | present (conversation + node refs + hash × 3) |
+| CLI redaction | conversation/node ids and prose absent; source refs hash-only |
+| Derived / evaluation / live snapshots | unchanged (0 added, 0 removed, 0 modified) |
+| Activity / Daily Chronicle / promotion / materialized view | none |
+| Provider / model invocation | none |
+
+`--perspective all` with only the existing operator evaluations
+agreed with the named perspective and kept `perspectiveStates`
+(length 1 × 3) rather than flattening them.
+
+Temporal comparison on the same stores, still with no mutation:
+
+```text
+asOf immediately before E5
+  3 machine-interpretation
+  evidence = unassessed × 3
+  recognition = unassessed × 3
+
+asOf at E5 event time
+  same 3 machine-interpretation
+  evidence = supported × 3
+  recognition = unassessed × 3
+```
+
+The view changed. The history did not.
+
+`recognition-unassessed` is the omitted E5 recognition dimension,
+not a conflict and not a belief. The smoke must not be read as:
+
+```text
+the user believes these three things
+these are accepted truths
+these are current personal beliefs
+```
+
+The correct reading:
+
+```text
+three machine interpretations
+whose cited evidence was later judged supported
+by the named human perspective,
+with personal recognition never assessed
+```
+
+### Proven
+
+- Real E5 history projects through E6 without mutation
+- Human evidence support does not become personal recognition
+- Machine provenance kind remains `machine-interpretation` after
+  human evaluation
+- Current state changes correctly across event-time `asOf`
+- The computed view is read-only
+- Privacy-safe CLI rendering preserves the internal/external
+  boundary
+
+### Not proven
+
+- Personal recognition in real use
+- Corrections in real use
+- Evaluator disagreement in real use
+- Competing machine interpretations
+- Successor forks
+- Longitudinal multi-revision history
+- Known-at-time semantics
+- Biography / profile generation
+- Alignment hypotheses
+- Model reliability
+
+A one-step evidence-support evaluation of three committed
+interpretations is not a claim that Chronicle has represented a
+human changing their mind.
+
+Longitudinal revision is the next experiment. It does **not** add a
+layer. See `docs/design/revision-experiment.md`.
+
 ## Out of scope
 
 - Biography / profile / free-form summary
 - Materialized current-understanding artifact
-- Known-at-T as-of
+- Known-at-time as-of
 - Inferred competition edges
 - Trust scoring / majority
 - Model-written current understanding
 - Activity / Daily Chronicle / promotion
 - Wayfinder / UI
-- E7
+- A new E7 schema or handler (not required; see
+  `docs/design/revision-experiment.md`)

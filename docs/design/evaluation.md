@@ -238,20 +238,21 @@ evaluations.
 
 ### Not proven
 
-- Current understanding
 - Personal recognition semantics in real use
 - Correction semantics in private use
 - Disagreement between evaluators
 - Competing machine interpretations (local adapter is backlog;
   `docs/design/local-model-adapter.md`)
-- Longitudinal evaluation
+- Longitudinal evaluation (a later human revision of an earlier
+  evaluation; see `docs/design/revision-experiment.md`)
 - Biography / profile generation
 - Automatic selection of durable memory
 - Model reliability
 
 Three append-only evaluations of one committed interpretation set are
-not a claim about current understanding or about how a person
-recognizes themselves over time.
+not a claim about how a person recognizes themselves over time.
+Current understanding of that one-step history was later measured
+separately (`docs/design/current-understanding.md`).
 
 ## Out of scope
 

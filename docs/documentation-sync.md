@@ -139,6 +139,11 @@ Implemented:
   byte-identical and `unreviewed`; no provider invoke; sanitized
   result in `docs/design/evaluation.md`; private source,
   observations, and evaluation prose are not in this repository)
+- E6 measured locally (read-only current-understanding over that
+  E5 history: 3 `machine-interpretation`, evidence `supported` × 3,
+  recognition `unassessed` × 3; view changed across event-time
+  `asOf` without mutating stores; no provider invoke; sanitized
+  result in `docs/design/current-understanding.md`)
 
 Not implemented:
 
@@ -153,6 +158,9 @@ Not implemented:
   `docs/design/local-model-adapter.md`; not E6)
 - bulk conversation scan
 - biography, profile, or materialized current-understanding artifact
+- a new E7 schema or handler (longitudinal revision is a private
+  experiment on existing E5/E6 machinery;
+  `docs/design/revision-experiment.md`)
 - general model reliability, multimodal coverage, or biography
 
 ---
