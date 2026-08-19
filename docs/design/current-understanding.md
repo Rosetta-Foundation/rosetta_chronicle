@@ -67,6 +67,14 @@ later. A future known-at-T query would be a separate policy.
 - Service does not read directories. It uses `listResolved`.
 - Core view keeps exact `sourceRefs`. Default CLI redacts
   conversation/node ids and prose.
+- `explanation.evaluationIds` is all in-scope historical evaluations
+  of that record/perspective. Dimension `contributingEvaluationIds`
+  are only the act(s) at the winning/latest `evaluatedAt`. Entry
+  contributors are the union of current evidence and current
+  recognition contributors. A same-evaluator tie cites only the
+  equal-time acts that produce the tie. Cross-evaluator
+  disagreement cites the current contributors to that dimension,
+  not superseded history.
 
 Policy: `current-understanding` version `1`.
 

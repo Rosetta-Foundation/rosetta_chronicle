@@ -110,6 +110,11 @@ const compareFailure = (
   (a.ref?.kind ?? '').localeCompare(b.ref?.kind ?? '') ||
   (a.ref?.id ?? '').localeCompare(b.ref?.id ?? '');
 
+/**
+ * Latest `evaluatedAt` wins for this evaluator/record/dimension.
+ * `contributingIds` are only the act(s) at that winning timestamp —
+ * superseded history is not a contributor to the current value.
+ */
 const reduceDimension = (
   evaluations: DerivedEvaluation[],
   evaluatorName: string,
@@ -138,7 +143,7 @@ const reduceDimension = (
         Boolean(value),
       ),
   );
-  const contributingIds = uniqueSorted(relevant.map((row) => row.id));
+  const contributingIds = uniqueSorted(latest.map((row) => row.id));
   if (values.length > 1) {
     return { state: 'conflict', contributingIds, tie: true };
   }
@@ -331,53 +336,36 @@ export const projectCurrentUnderstanding = (input: {
         evaluationIds: entry.explanation.evaluationIds,
       });
     }
-    const states = entry.perspectiveStates ?? [];
-    for (const row of states) {
-      if (row.evidenceState === 'conflict') {
-        conflicts.push({
-          code: 'same-evaluator-tie',
-          derivedRecordIds: [entry.derivedRecordId],
-          evaluationIds: row.contributingEvaluationIds,
-          dimension: 'evidenceSupport',
-        });
-      }
-      if (row.recognitionState === 'conflict') {
-        conflicts.push({
-          code: 'same-evaluator-tie',
-          derivedRecordIds: [entry.derivedRecordId],
-          evaluationIds: row.contributingEvaluationIds,
-          dimension: 'personalRecognition',
-        });
-      }
-    }
-    if (perspective.kind === 'evaluator') {
-      const evidence = reduceDimension(
+    const dimensionReductions = observerNames.map((name) => ({
+      evidence: reduceDimension(
         evaluations,
-        perspective.name,
+        name,
         entry.derivedRecordId,
         'evidenceSupport',
         asOf,
-      );
-      const recognition = reduceDimension(
+      ),
+      recognition: reduceDimension(
         evaluations,
-        perspective.name,
+        name,
         entry.derivedRecordId,
         'personalRecognition',
         asOf,
-      );
-      if (evidence.tie) {
+      ),
+    }));
+    for (const row of dimensionReductions) {
+      if (row.evidence.tie) {
         conflicts.push({
           code: 'same-evaluator-tie',
           derivedRecordIds: [entry.derivedRecordId],
-          evaluationIds: evidence.contributingIds,
+          evaluationIds: row.evidence.contributingIds,
           dimension: 'evidenceSupport',
         });
       }
-      if (recognition.tie) {
+      if (row.recognition.tie) {
         conflicts.push({
           code: 'same-evaluator-tie',
           derivedRecordIds: [entry.derivedRecordId],
-          evaluationIds: recognition.contributingIds,
+          evaluationIds: row.recognition.contributingIds,
           dimension: 'personalRecognition',
         });
       }
@@ -385,28 +373,36 @@ export const projectCurrentUnderstanding = (input: {
     if (
       perspective.kind === 'all' &&
       entry.currentEvidenceState === 'conflict' &&
-      !(entry.perspectiveStates ?? []).some(
-        (row) => row.evidenceState === 'conflict',
-      )
+      !dimensionReductions.some((row) => row.evidence.tie)
     ) {
       conflicts.push({
         code: 'cross-evaluator-disagreement',
         derivedRecordIds: [entry.derivedRecordId],
-        evaluationIds: entry.contributingEvaluationIds,
+        evaluationIds: uniqueSorted(
+          dimensionReductions.flatMap((row) =>
+            row.evidence.state === 'unassessed'
+              ? []
+              : row.evidence.contributingIds,
+          ),
+        ),
         dimension: 'evidenceSupport',
       });
     }
     if (
       perspective.kind === 'all' &&
       entry.currentRecognitionState === 'conflict' &&
-      !(entry.perspectiveStates ?? []).some(
-        (row) => row.recognitionState === 'conflict',
-      )
+      !dimensionReductions.some((row) => row.recognition.tie)
     ) {
       conflicts.push({
         code: 'cross-evaluator-disagreement',
         derivedRecordIds: [entry.derivedRecordId],
-        evaluationIds: entry.contributingEvaluationIds,
+        evaluationIds: uniqueSorted(
+          dimensionReductions.flatMap((row) =>
+            row.recognition.state === 'unassessed'
+              ? []
+              : row.recognition.contributingIds,
+          ),
+        ),
         dimension: 'personalRecognition',
       });
     }
