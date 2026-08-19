@@ -17,7 +17,9 @@ EVALUATION             what someone later thought about that interpretation
 CURRENT UNDERSTANDING  a future VIEW over those histories — not this phase
 ```
 
-An evaluation is a historical act, not timeless truth.
+An evaluation is a historical act, not timeless truth. A later
+judgment does not make the earlier interpretation “wrong history.”
+See `docs/design/temporal-evaluation-rationale.md`.
 
 ## What is an evaluation?
 
@@ -74,7 +76,10 @@ suppliedRecordId?, precedingEvaluationId?
 ```
 
 `evaluatedAt` is the event time of the human judgment. It
-participates in identity: 2026 and 2028 do not collapse.
+participates in identity: 2026 and 2028 do not collapse. That is
+what lets a later mind ask what was understood at T1 without
+rewriting T1 when T2 arrives
+(`docs/design/temporal-evaluation-rationale.md`).
 
 `recordedAt` is when Chronicle persisted that judgment. It is
 **not** in the id and must not be rewritten once the artifact exists.
@@ -236,7 +241,8 @@ evaluations.
 - Personal recognition semantics in real use
 - Correction semantics in private use
 - Disagreement between evaluators
-- Competing machine interpretations
+- Competing machine interpretations (local adapter is backlog;
+  `docs/design/local-model-adapter.md`)
 - Longitudinal evaluation
 - Biography / profile generation
 - Automatic selection of durable memory

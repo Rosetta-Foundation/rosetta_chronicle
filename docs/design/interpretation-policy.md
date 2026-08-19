@@ -252,7 +252,10 @@ on `producer.model`. Do not record Cursor model display names.
 
 The adapter does not validate observation schema, persist the
 expanded prompt, or log credentials or source. A second provider,
-Cursor agent transport, and a vendored SDK are out of scope.
+Cursor agent transport, a vendored SDK, and a local inference
+adapter are out of scope. Local transport, if added later, is
+another `IModelInvocationRepository` implementation — not a second
+interpretation pathway. See `docs/design/local-model-adapter.md`.
 
 Public tests use the synthetic ChatGPT export fixture and a mocked
 HTTP transport. E4b private smoke is a local experiment; its source
@@ -401,7 +404,8 @@ promote, does not accept `--review-state` or `--content`.
 - `priorRecordIds` / `derived-record/2`
 - Review CLI
 - Attachment-lineage walk
-- Vendor SDK / Cursor agent transport / a second live provider
+- Vendor SDK / Cursor agent transport / a second live provider /
+  local inference adapter (`docs/design/local-model-adapter.md`)
 - Human evaluation mechanics (see `docs/design/evaluation.md`)
 - Private E4b source or observation text in this repository
 - Redesigning provenance `partial`

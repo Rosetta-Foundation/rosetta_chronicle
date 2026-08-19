@@ -145,7 +145,9 @@ Not implemented:
 - automatic summarization or reflection extraction
 - raw attachment persistence
 - generalized personal activity modeling
-- a second live provider, Cursor agent transport, or a vendored SDK
+- a second live provider, Cursor agent transport, a vendored SDK,
+  or a local inference adapter (backlog:
+  `docs/design/local-model-adapter.md`; not E6)
 - bulk conversation scan
 - current-understanding view, biography, or profile materialization
 - general model reliability, multimodal coverage, or biography
