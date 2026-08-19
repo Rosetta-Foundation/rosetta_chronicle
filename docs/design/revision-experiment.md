@@ -44,7 +44,7 @@ Existing E5/E6 already express the required shape.
 | History of both acts | `explanation.evaluationIds` = in-scope historical evals of that record/perspective |
 | Current contributors only | Dimension `contributingEvaluationIds` = act(s) at the winning timestamp |
 | No “latest value” field | `CurrentUnderstandingView` is computed. Nothing writes a current-state column |
-| Equal-time contradiction | `same-evaluator-tie` → current state `conflict`; both equal-time acts are current contributors |
+| Equal-time contradiction | `same-evaluator-tie` → current state `conflict`; both equal-time acts are current contributors. This is an **adversarial projection probe**, not a real human revision event |
 | Machine record stays itself | `evaluate-derived` does not mutate `DerivedRecord`; kind stays historical |
 
 `precedingEvaluationId` is optional “responds to” lineage. E6
@@ -63,7 +63,8 @@ Do not add tests just to baptize a phase. These already exist:
   as current contributor and both acts in
   `explanation.evaluationIds`
 - Utils / service: same-`evaluatedAt` contradictory values →
-  `conflict` / `same-evaluator-tie`
+  `conflict` / `same-evaluator-tie` (synthetic adversarial probe,
+  not a recorded human revision)
 
 What synthetic coverage has **not** done is touch the private E4b
 corpus. That is the remaining E7 work.
@@ -150,28 +151,45 @@ T3.
 No “latest value” written anywhere. No current-understanding
 artifact. No model call.
 
-### Equal-time contradictory case
+Label this track **longitudinal revision** in the sanitized report
+and in any later checkpoint. It is the E7 revision-provenance
+experiment.
 
-After T2 (or on a **different** one of the three records, so the
-primary longitudinal pair stays clean):
+### Adversarial projection probe (equal-time pair)
+
+**Not a real human revision event.** This track is an intentionally
+constructed probe of the projection: two append-only evaluations
+with the same `evaluatedAt` and contradictory
+`personalRecognition` values. It tests whether current
+understanding reports `conflict` instead of silently picking a
+winner. Do not describe it as the operator holding two beliefs at
+once, and do not fold it into the longitudinal-revision result.
+
+Use a **different** one of the three records so Track A stays
+clean. Do not write a T2/T3 sequence on this record.
 
 ```text
-T3a  personalRecognition = recognized
-T3b  personalRecognition = rejected
-     same evaluatedAt
+PROBE  (constructed; same evaluatedAt)
+  personalRecognition = recognized
+  personalRecognition = rejected
 ```
 
 Identity already distinguishes these two acts (dimension values
 differ; a synthetic note is not required). Expected:
 
 - current recognition state = `conflict`
-- both T3 acts are current contributors
-- T2 remains in `explanation.evaluationIds` and is **not** a
-  current recognition contributor
-- `--as-of T2` still returns `recognized` from T2
+- both probe acts are current recognition contributors
+- the E5 evaluation remains in `explanation.evaluationIds` and is
+  **not** a current recognition contributor
+- `--as-of` before the probe timestamp: recognition still
+  `unassessed` (E5 omitted that dimension)
+- kind remains `machine-interpretation`
 
-Do **not** create artificial corruption. Do **not** mutate T2 to
-manufacture the tie.
+Do **not** create artificial corruption. Do **not** mutate Track A
+artifacts to manufacture the tie.
+
+Label this track **adversarial projection probe** in the sanitized
+report and in any later checkpoint.
 
 ### Read-only after the writes
 
@@ -184,24 +202,33 @@ discipline as E6.
 Same privacy floor as E5/E6: no statements, source text,
 conversation/node ids, artifact ids, titles, filenames, or notes.
 
-Include: engine revision, which dimension was revised, as-of times,
-state histograms, conflict codes, contributor/history split,
-snapshot hashes-unchanged for T1 and E5, confirmation of no
-provider path.
+Include: engine revision; **separate** histograms and
+contributor/history splits for (1) longitudinal revision and
+(2) adversarial projection probe; as-of times; conflict codes;
+snapshot hashes-unchanged for T1 and E5; confirmation of no
+provider path. Do not present the probe as a human revision.
 
 ### Proven / not proven (after a green private run)
 
-**Would prove**
+**Would prove (longitudinal revision)**
 
-- One real human revision is representable as two immutable
+- One experimental human revision is representable as two immutable
   evaluations
 - Current understanding at T2 and T3 can be reconstructed from
   history without a latest-value field
 - Transitions remain inspectable (T2 still exists after T3)
 
+**Would prove (adversarial projection probe only)**
+
+- Equal-time contradictory evaluations surface as `conflict`
+  rather than a silent winner
+- Superseded (or in-scope but non-winning) history is not treated
+  as a current contributor
+
 **Would not prove**
 
 - The Revision Provenance Hypothesis in general
+- That a human actually held two simultaneous recognitions
 - Multi-evaluator disagreement in real use
 - Evidence and recognition revised together
 - Corrections (`suppliedRecordId`)
