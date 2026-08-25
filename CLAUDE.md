@@ -18,8 +18,13 @@ become coupled to any single downstream consumer.**
 
 Implementation doctrine (invariants, GREEN/YELLOW/RED, method, envelope):
 [`../rosetta_docs/process/chronicle-build-charter.md`](../rosetta_docs/process/chronicle-build-charter.md).
-Private current-state is not in this repo. Prefer extending source-graph /
-vault machinery over new ontology.
+Private current-state is not in this repo.
+
+**v0.1 Daily Chronicle / `Activity` / `getActivity` is deprecated and
+frozen.** Do not add sources, adapters, or hook behavior on that path.
+Do not use it for new work. Leave the code as historical record. Prefer
+source-graph / vault machinery. A replacement day-view is not authorized
+until it has a specimen that does not use `Activity` as the intermediate.
 
 ## Architecture — Handler / Service / Repository (MANDATORY)
 

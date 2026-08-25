@@ -27,8 +27,9 @@ import type { INotesRepository } from '../repositories/notes.repository';
 import type { ICalendarRepository } from '../repositories/calendar.repository';
 
 /**
- * The synthesis engine. Gathers activity from every source repository,
- * correlates evidence, infers tags, and composes the Daily Chronicle document.
+ * v0.1 Daily Chronicle synthesis. **Deprecated / frozen** — gathers
+ * `Activity` from source repositories and composes the daily Markdown.
+ * Not the capture contract for new work. See the Build Charter.
  *
  * Business/orchestration logic lives here. Services compose repositories; they
  * never call other services.

@@ -1,5 +1,17 @@
 # Chronicle — Architecture
 
+## v0.1 Daily Chronicle — frozen
+
+`Activity`, `getActivity` adapters (git, jira, claude-code, cursor, notes,
+calendar), `DailyChronicleHandler`, `backfill` / `append-session`, and the
+session Stop hooks are **deprecated as the source contract**. They remain
+in the tree as historical record. Do not add `ActivitySource` members or
+new activity adapters. New work follows the Build Charter: vault + source
+graph + later views. A day may later be a view over evidence; that is not
+this path and is not authorized until it has a specimen.
+
+See [`../../rosetta_docs/process/chronicle-build-charter.md`](../../rosetta_docs/process/chronicle-build-charter.md).
+
 ## Long-term data flow
 
 Chronicle sits between raw engineering activity (sources) and structured knowledge (consumers):

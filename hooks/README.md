@@ -1,5 +1,10 @@
 # Chronicle Session Hooks — Live Session Append
 
+**Deprecated / frozen (2026-08-25).** These hooks append v0.1 Daily
+Chronicle `Activity` summaries. They are historical record, not the
+capture path for new work. Do not add hook behavior. See the Build
+Charter.
+
 Automatically appends ended agent sessions to your Daily Chronicle. Zero manual
 action required once installed via `team-setup` full `setup`.
 

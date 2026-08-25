@@ -30,10 +30,11 @@ export interface DailyChronicleResult {
 }
 
 /**
- * Entry point for generating a Daily Chronicle. Parses the request, dispatches
- * to the service, optionally persists the result, and returns it. Composition
- * (migrate notes → capture notes → generate → persist) happens here, not in a
- * service. No business logic.
+ * Entry point for generating a v0.1 Daily Chronicle. **Deprecated / frozen**
+ * with that MVP — not the capture path for new work. Parses the request,
+ * dispatches to the service, optionally persists the result, and returns
+ * it. Composition (migrate notes → capture notes → generate → persist)
+ * happens here, not in a service. No business logic.
  */
 export interface IDailyChronicleHandler {
   handle(input: DailyChronicleInput): Promise<DailyChronicleResult>;
