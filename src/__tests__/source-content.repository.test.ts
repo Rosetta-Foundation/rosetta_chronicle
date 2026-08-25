@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'fs';
+import { cpSync, mkdtempSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { SourceContentRepository } from '../repositories/source-content.repository';
@@ -68,6 +68,37 @@ describe('SourceContentRepository', () => {
     expect(JSON.stringify(multimodal.nodes)).not.toContain(
       'REDACTED_FILENAME_MUST_NOT_LEAK',
     );
+  });
+
+  it('resolves cited node text from a same-bytes copy at a different path', async () => {
+    const copyDir = mkdtempSync(join(tmpdir(), 'src-content-export-copy-'));
+    try {
+      cpSync(FIXTURE, copyDir, { recursive: true });
+      const imported = await importService.importGraph(
+        FIXTURE,
+        graphsDir,
+        IMPORTED,
+        false,
+      );
+      const graph = await graphStore.read(
+        graphsDir,
+        imported.contentHash as string,
+      );
+      expect(graph).not.toBeNull();
+      const resolved = await repo.resolve({
+        exportPath: copyDir,
+        sourceGraphHash: imported.contentHash as string,
+        conversationId: 'conv-linear',
+        nodeIds: ['node-linear-1'],
+        graph: graph!,
+      });
+      expect(resolved.ok).toBe(true);
+      if (!resolved.ok) return;
+      expect(resolved.contentHash).toBe(imported.contentHash);
+      expect(resolved.nodes[0]?.text).toContain('REDACTED_SHOULD_NOT_LEAK');
+    } finally {
+      rmSync(copyDir, { recursive: true, force: true });
+    }
   });
 
   it('fails when the export hash does not match the cited graph', async () => {

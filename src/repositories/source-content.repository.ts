@@ -46,6 +46,10 @@ const UNZIP_MAX_BUFFER = 64 * 1024 * 1024;
  * Verifies the live export hash matches the cited source graph, then
  * extracts only the cited nodes. Attachment presence comes from the
  * already-imported graph, not from inventing blob contents.
+ *
+ * `exportPath` is a locator, not identity: a same-bytes directory tree
+ * at a different path hashes the same and resolve succeeds. Identity is
+ * the shard-name + shard-bytes SHA-256.
  */
 @injectable()
 export class SourceContentRepository implements ISourceContentRepository {
