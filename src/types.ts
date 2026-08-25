@@ -13,7 +13,7 @@
  */
 export const NEEDS_REVIEW_MARKER = '[needs-review]';
 
-/** The activity sources Chronicle can observe. New sources are added here. */
+/** The activity sources v0.1 Daily Chronicle could observe. Frozen — do not add members. */
 export type ActivitySource =
   | 'git'
   | 'jira'
@@ -22,10 +22,11 @@ export type ActivitySource =
   | 'notes'
   | 'calendar';
 
-// future: 'github' | 'slack' | 'confluence' | 'chatgpt-export'
-// `chatgpt-export` is not a member. Phase 2 persists a source graph, not
-// Activity. Leave this union unchanged until a later phase emits Activity.
-/** The Rosetta tag taxonomy (see docs/mvp.md). */
+// `chatgpt-export` is not a member and must not become one. Phase 2 persists
+// a source graph, not Activity. This union is frozen (Build Charter).
+/**
+ * v0.1 Daily Chronicle tag taxonomy (see docs/mvp.md). Frozen with that MVP.
+ */
 export type Tag =
   | 'DELIVERY'
   | 'RELIABILITY'
@@ -49,7 +50,12 @@ export interface Evidence {
   url?: string;
 }
 
-/** A single observed engineering event from a source. */
+/**
+ * v0.1 Daily Chronicle activity event. **Deprecated / frozen** — not the
+ * capture contract for new work. One timestamp + summary cannot honestly
+ * represent conversational source graphs. Do not add sources. See the
+ * Build Charter.
+ */
 export interface Activity {
   source: ActivitySource;
   /** Stable identifier within the source. */
@@ -95,7 +101,7 @@ export interface ChronicleWindow {
   end: string;
 }
 
-/** Inputs required to generate a Daily Chronicle (see docs/mvp.md). */
+/** Inputs required to generate a v0.1 Daily Chronicle (frozen; see docs/mvp.md). */
 export interface DailyChronicleInput {
   window: ChronicleWindow;
   /**
@@ -183,7 +189,7 @@ export interface ChronicleSection {
   evidence: Evidence[];
 }
 
-/** The synthesized Daily Chronicle output (the v0.1 deliverable). */
+/** The synthesized v0.1 Daily Chronicle output. Frozen with that MVP. */
 export interface DailyChronicle {
   window: ChronicleWindow;
   sections: ChronicleSection[];

@@ -1,8 +1,14 @@
 # Chronicle — MVP v0.1: Daily Chronicle
 
-The initial goal is intentionally small: generate a **Daily Engineering Chronicle**. This proves the
-core concept — that engineering activity can be transformed into durable, evidence-backed knowledge —
-before we expand to weekly/monthly/quarterly rollups and additional sources.
+**Status: deprecated / frozen (2026-08-25).** This document describes the
+v0.1 Daily Chronicle prototype. `Activity` / `getActivity` is **not** the
+capture contract for new work. See
+[`../../rosetta_docs/process/chronicle-build-charter.md`](../../rosetta_docs/process/chronicle-build-charter.md).
+Do not extend this MVP. Do not delete the implementation until a
+replacement day-view has its own specimen.
+
+The initial goal was intentionally small: generate a **Daily Engineering Chronicle**.
+That prototype is frozen. New work does not extend it.
 
 ## Inputs
 

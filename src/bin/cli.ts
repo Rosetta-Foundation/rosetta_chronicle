@@ -53,9 +53,10 @@ import { CHRONICLE_TOKENS } from '../tokens';
  *   chronicle evaluate-derived    Append-only human evaluation of a derived record.
  *   chronicle current-understanding  Read-only view over interpretation history.
  *
- * Daily Chronicle commands write to the personal Chronicle repo
- * (CHRONICLE_REPO env var or --repo flag) and are idempotent by content hash.
- * import-chatgpt writes a source graph, not Activity or a Daily Chronicle.
+ * Daily Chronicle commands (backfill, append-session) are **deprecated /
+ * frozen v0.1**. They remain for historical record. Do not use them for
+ * new work. import-chatgpt writes a source graph, not Activity or a
+ * Daily Chronicle.
  */
 
 const USAGE = `
@@ -81,9 +82,10 @@ Usage:
   chronicle queue list [--state active|next|inbox|done] [--repo <path>]
 
 Commands:
-  backfill            Generate Daily Chronicles for a date range and persist them.
-  append-session      Append a single agent session (Claude Code or Cursor) to
-                      today's Chronicle.
+  backfill            DEPRECATED (frozen v0.1). Generate Daily Chronicles
+                      for a date range. Do not use for new work.
+  append-session      DEPRECATED (frozen v0.1). Append a Claude Code or
+                      Cursor session summary to today's Chronicle.
                       Reads a JSON payload from stdin when --session-id is omitted
                       (Stop hook mode: {"session_id":"...", "cwd":"..."}).
   queue               Manage the personal work queue (PRD-0007).
