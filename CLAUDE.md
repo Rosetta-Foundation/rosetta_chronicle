@@ -14,6 +14,13 @@ become coupled to any single downstream consumer.**
 - **Human + AI** — outputs are equally valuable to engineers, managers, and future AI agents.
 - **Extensible** — Chronicle exposes structured data; it does not own presentation.
 
+## Build Charter
+
+Implementation doctrine (invariants, GREEN/YELLOW/RED, method, envelope):
+[`../rosetta_docs/process/chronicle-build-charter.md`](../rosetta_docs/process/chronicle-build-charter.md).
+Private current-state is not in this repo. Prefer extending source-graph /
+vault machinery over new ontology.
+
 ## Architecture — Handler / Service / Repository (MANDATORY)
 
 All TypeScript in this repo follows the Handler / Service / Repository + InversifyJS pattern. The
