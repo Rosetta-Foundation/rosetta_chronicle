@@ -9,6 +9,7 @@ import {
   getProvenanceHandler,
   getInterpretHandler,
   getEvaluateHandler,
+  getObserveHandler,
 } from '../index';
 import { CHRONICLE_TOKENS } from '../tokens';
 
@@ -95,6 +96,14 @@ describe('getInterpretHandler', () => {
 describe('getEvaluateHandler', () => {
   it('resolves the evaluate handler with its dependency graph', () => {
     const handler = getEvaluateHandler();
+    expect(handler).toBeDefined();
+    expect(typeof handler.handle).toBe('function');
+  });
+});
+
+describe('getObserveHandler', () => {
+  it('resolves the observe handler with its dependency graph', () => {
+    const handler = getObserveHandler();
     expect(handler).toBeDefined();
     expect(typeof handler.handle).toBe('function');
   });

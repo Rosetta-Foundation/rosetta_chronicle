@@ -145,6 +145,26 @@ import {
   IEvaluationStore,
   EvaluationStore,
 } from './repositories/evaluation-store.repository';
+import {
+  ISourceVaultRepository,
+  SourceVaultRepository,
+} from './repositories/source-vault.repository';
+import {
+  IObserveConfigRepository,
+  ObserveConfigRepository,
+} from './repositories/observe-config.repository';
+import {
+  IObservationReceiptRepository,
+  ObservationReceiptRepository,
+} from './repositories/observation-receipt.repository';
+import {
+  IObserveService,
+  ObserveService,
+} from './services/observe.service';
+import {
+  IObserveHandler,
+  ObserveHandler,
+} from './observe.handler';
 
 /**
  * Composition root. Wires the InversifyJS container and exposes a factory for
@@ -219,6 +239,17 @@ export const buildContainer = (): Container => {
   container
     .bind<IEvaluationStore>(CHRONICLE_TOKENS.EvaluationStore)
     .to(EvaluationStore);
+  container
+    .bind<ISourceVaultRepository>(CHRONICLE_TOKENS.SourceVaultRepository)
+    .to(SourceVaultRepository);
+  container
+    .bind<IObserveConfigRepository>(CHRONICLE_TOKENS.ObserveConfigRepository)
+    .to(ObserveConfigRepository);
+  container
+    .bind<IObservationReceiptRepository>(
+      CHRONICLE_TOKENS.ObservationReceiptRepository,
+    )
+    .to(ObservationReceiptRepository);
 
   // Services
   container
@@ -250,6 +281,9 @@ export const buildContainer = (): Container => {
       CHRONICLE_TOKENS.CurrentUnderstandingService,
     )
     .to(CurrentUnderstandingService);
+  container
+    .bind<IObserveService>(CHRONICLE_TOKENS.ObserveService)
+    .to(ObserveService);
 
   // Handlers
   container
@@ -281,6 +315,9 @@ export const buildContainer = (): Container => {
       CHRONICLE_TOKENS.CurrentUnderstandingHandler,
     )
     .to(CurrentUnderstandingHandler);
+  container
+    .bind<IObserveHandler>(CHRONICLE_TOKENS.ObserveHandler)
+    .to(ObserveHandler);
 
   return container;
 };
@@ -348,3 +385,8 @@ export const getCurrentUnderstandingHandler =
       CHRONICLE_TOKENS.CurrentUnderstandingHandler,
     );
   };
+
+/** Resolve the V1 raw-observe handler from a fresh container. */
+export const getObserveHandler = (): IObserveHandler => {
+  return buildContainer().get<IObserveHandler>(CHRONICLE_TOKENS.ObserveHandler);
+};
