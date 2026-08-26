@@ -1,4 +1,10 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  statSync,
+  writeFileSync,
+} from 'fs';
 import { dirname, isAbsolute, join } from 'path';
 import { inject, injectable } from 'inversify';
 import { CHRONICLE_TOKENS } from '../tokens';
@@ -6,6 +12,7 @@ import {
   ObserveCommand,
   ObserveConfig,
   ObserveFileResult,
+  ObserveRun,
   ObservationReceipt,
   ObserveVaultStatus,
 } from '../types';
@@ -13,9 +20,10 @@ import type { ISourceVaultRepository } from '../repositories/source-vault.reposi
 import { sha256Bytes } from '../repositories/source-vault.repository';
 import type { IObserveConfigRepository } from '../repositories/observe-config.repository';
 import type { IObservationReceiptRepository } from '../repositories/observation-receipt.repository';
+import { listAllowlistedFiles } from '../utils/observe-files.utils';
 
 /**
- * V1 raw observe: allowlisted file → hash → copy-if-new → receipt.
+ * V1 raw observe: allowlisted file or directory → hash → copy-if-new → receipt.
  *
  * No interpretation, no Activity. STOP and forget-scope are operator
  * controls over Chronicle-owned copies only.
@@ -79,13 +87,14 @@ export class ObserveService implements IObserveService {
     filePath: string;
   }): Promise<ObserveConfig> {
     const existing = await this._config.read(command.dataDir);
-    const path = isAbsolute(command.filePath)
+    const abs = isAbsolute(command.filePath)
       ? command.filePath
       : join(process.cwd(), command.filePath);
+    const kind = statSync(abs).isDirectory() ? 'directory' : 'file';
     const scope = {
       id: command.scopeId,
-      kind: 'file' as const,
-      path,
+      kind: kind as 'file' | 'directory',
+      path: abs,
       stopped: false,
       forgotten: false,
     };
@@ -111,33 +120,59 @@ export class ObserveService implements IObserveService {
     dataDir: string,
     scopeId: string,
     capturedAt?: string,
-  ): Promise<ObserveFileResult> {
+  ): Promise<ObserveRun> {
     const config = await this.requireConfig(dataDir);
     const scope = config.scopes.find((s) => s.id === scopeId);
     if (!scope) throw new Error(`unknown scope: ${scopeId}`);
     if (scope.forgotten) {
-      return { status: 'skipped-forgotten' };
+      return {
+        scopeId,
+        results: [{ status: 'skipped-forgotten' }],
+      };
     }
     if (config.stopped || scope.stopped) {
-      return { status: 'skipped-stopped' };
+      return {
+        scopeId,
+        results: [{ status: 'skipped-stopped' }],
+      };
     }
     if (!existsSync(scope.path)) {
-      return { status: 'missing-source' };
+      return {
+        scopeId,
+        results: [{ status: 'missing-source' }],
+      };
     }
-    const bytes = readFileSync(scope.path);
-    const contentHash = sha256Bytes(bytes);
+    const files = listAllowlistedFiles(scope.path);
     const at = capturedAt ?? new Date().toISOString();
+    const results: ObserveFileResult[] = [];
+    for (let i = 0; i < files.length; i += 1) {
+      results.push(
+        await this.observeOneFile(dataDir, scopeId, files[i] as string, at, i),
+      );
+    }
+    return { scopeId, results };
+  }
+
+  private async observeOneFile(
+    dataDir: string,
+    scopeId: string,
+    filePath: string,
+    capturedAt: string,
+    index: number,
+  ): Promise<ObserveFileResult> {
+    const bytes = readFileSync(filePath);
+    const contentHash = sha256Bytes(bytes);
     const put = await this._vault.putIfNew(
       vaultRootOf(dataDir),
       contentHash,
       bytes,
     );
     const receipt: ObservationReceipt = {
-      observationId: `obs-${contentHash.slice(0, 12)}-${Date.now()}`,
+      observationId: `obs-${contentHash.slice(0, 12)}-${Date.now()}-${index}`,
       scopeId,
       sourceKind: 'file',
-      sourcePath: scope.path,
-      capturedAt: at,
+      sourcePath: filePath,
+      capturedAt,
       contentHash,
       bytes: bytes.length,
       clockClass: 'meta',
@@ -153,9 +188,9 @@ export class ObserveService implements IObserveService {
   private async watchOnce(
     dataDir: string,
     capturedAt?: string,
-  ): Promise<ObserveFileResult[]> {
+  ): Promise<ObserveRun[]> {
     const config = await this.requireConfig(dataDir);
-    const results: ObserveFileResult[] = [];
+    const results: ObserveRun[] = [];
     for (const scope of config.scopes) {
       results.push(await this.observeScope(dataDir, scope.id, capturedAt));
     }

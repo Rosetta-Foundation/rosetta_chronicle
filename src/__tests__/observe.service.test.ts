@@ -1,5 +1,11 @@
 import 'reflect-metadata';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { Container } from 'inversify';
@@ -50,22 +56,28 @@ describe('ObserveService', () => {
       dataDir,
       scopeId: 'synth-1',
       capturedAt: '2026-08-26T00:00:00.000Z',
-    })) as { status: string; receipt: { contentHash: string } };
-    expect(first.status).toBe('stored');
+    })) as {
+      results: { status: string; receipt: { contentHash: string } }[];
+    };
+    expect(first.results[0]?.status).toBe('stored');
     const again = (await service.handle({
       op: 'observe',
       dataDir,
       scopeId: 'synth-1',
-    })) as { status: string };
-    expect(again.status).toBe('duplicate');
+    })) as { results: { status: string }[] };
+    expect(again.results[0]?.status).toBe('duplicate');
     writeFileSync(source, '{"id":"synth","body":"STATE_B"}\n');
     const second = (await service.handle({
       op: 'observe',
       dataDir,
       scopeId: 'synth-1',
-    })) as { status: string; receipt: { contentHash: string } };
-    expect(second.status).toBe('stored');
-    expect(second.receipt.contentHash).not.toBe(first.receipt.contentHash);
+    })) as {
+      results: { status: string; receipt: { contentHash: string } }[];
+    };
+    expect(second.results[0]?.status).toBe('stored');
+    expect(second.results[0]?.receipt.contentHash).not.toBe(
+      first.results[0]?.receipt.contentHash,
+    );
     const status = (await service.handle({
       op: 'status',
       dataDir,
@@ -75,7 +87,7 @@ describe('ObserveService', () => {
     const resolved = (await service.handle({
       op: 'resolve',
       dataDir,
-      contentHash: first.receipt.contentHash,
+      contentHash: first.results[0]!.receipt.contentHash,
       outputPath: out,
     })) as { ok: boolean };
     expect(resolved.ok).toBe(true);
@@ -92,9 +104,9 @@ describe('ObserveService', () => {
     const results = (await service.handle({
       op: 'watch-once',
       dataDir,
-    })) as { status: string }[];
+    })) as { results: { status: string }[] }[];
     expect(results).toHaveLength(1);
-    expect(results[0]?.status).toBe('stored');
+    expect(results[0]?.results[0]?.status).toBe('stored');
   });
 
   it('STOP skips observe; forget-scope deletes our copy and refuses later', async () => {
@@ -110,8 +122,8 @@ describe('ObserveService', () => {
       op: 'observe',
       dataDir,
       scopeId: 'synth-1',
-    })) as { status: string };
-    expect(skipped.status).toBe('skipped-stopped');
+    })) as { results: { status: string }[] };
+    expect(skipped.results[0]?.status).toBe('skipped-stopped');
     await service.handle({ op: 'resume', dataDir, scopeId: 'synth-1' });
     const forgotten = (await service.handle({
       op: 'forget-scope',
@@ -123,12 +135,32 @@ describe('ObserveService', () => {
       op: 'observe',
       dataDir,
       scopeId: 'synth-1',
-    })) as { status: string };
-    expect(after.status).toBe('skipped-forgotten');
+    })) as { results: { status: string }[] };
+    expect(after.results[0]?.status).toBe('skipped-forgotten');
     const status = (await service.handle({
       op: 'status',
       dataDir,
     })) as { objectCount: number };
     expect(status.objectCount).toBe(0);
+  });
+
+  it('observes every file under an allowlisted directory', async () => {
+    const dir = join(dataDir, 'export');
+    mkdirSync(dir);
+    writeFileSync(join(dir, 'conversations-000.json'), '[]\n');
+    writeFileSync(join(dir, 'user.json'), '{}\n');
+    await service.handle({
+      op: 'init',
+      dataDir,
+      scopeId: 'export-1',
+      filePath: dir,
+    });
+    const run = (await service.handle({
+      op: 'observe',
+      dataDir,
+      scopeId: 'export-1',
+    })) as { results: { status: string }[] };
+    expect(run.results).toHaveLength(2);
+    expect(run.results.every((r) => r.status === 'stored')).toBe(true);
   });
 });

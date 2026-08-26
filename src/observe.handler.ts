@@ -4,7 +4,7 @@ import { ObserveCommand } from './types';
 import type { IObserveService } from './services/observe.service';
 
 /**
- * CLI entry for V1 raw observe (allowlisted files → private vault).
+ * CLI entry for V1 raw observe (allowlisted files or directories → private vault).
  *
  * No business logic. Does not interpret source. Does not write Activity.
  */
