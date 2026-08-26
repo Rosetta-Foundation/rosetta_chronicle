@@ -10,6 +10,7 @@ import {
   getInterpretHandler,
   getEvaluateHandler,
   getCurrentUnderstandingHandler,
+  getObserveHandler,
   buildContainer,
 } from '../index';
 import {
@@ -52,6 +53,12 @@ import { CHRONICLE_TOKENS } from '../tokens';
  *   chronicle interpret-source    Machine interpretation with provenance (E4).
  *   chronicle evaluate-derived    Append-only human evaluation of a derived record.
  *   chronicle current-understanding  Read-only view over interpretation history.
+ *   chronicle observe-init   Allowlist a file scope beside a private vault.
+ *   chronicle observe        Observe one allowlisted file (hash, copy-if-new).
+ *   chronicle watch          Poll allowlisted scopes once (--once) or until SIGINT.
+ *   chronicle observe-stop / observe-resume
+ *   chronicle forget-scope   V1 scope-only forget of Chronicle-owned copies.
+ *   chronicle vault-status / vault-resolve
  *
  * Daily Chronicle commands (backfill, append-session) are **deprecated /
  * frozen v0.1**. They remain for historical record. Do not use them for
@@ -76,6 +83,14 @@ Usage:
   chronicle interpret-source --type candidate-observation --export <path> --graph <file> --source-graph-hash <hex> --conversation-id <id> --node-id <id> --output <dir> --executions <dir> --definitions <dir> --occurrences <dir> --provider <name> --model <id> [--dry-run]
   chronicle evaluate-derived --derived <id> --evaluator-name <name> [--evidence-support supported|not-supported|uncertain] [--personal-recognition recognized|rejected|uncertain] --evaluations <dir> --output <dir> [--dry-run]
   chronicle current-understanding --output <dir> --evaluations <dir> (--evaluator-name <name> | --perspective all) [--as-of <iso>]
+  chronicle observe-init --data-dir <dir> --scope <id> --path <file>
+  chronicle observe --data-dir <dir> --scope <id>
+  chronicle watch --data-dir <dir> [--once]
+  chronicle observe-stop --data-dir <dir> [--scope <id>]
+  chronicle observe-resume --data-dir <dir> [--scope <id>]
+  chronicle forget-scope --data-dir <dir> --scope <id>
+  chronicle vault-status --data-dir <dir>
+  chronicle vault-resolve --data-dir <dir> --hash <hex> --output <file>
   chronicle queue [show] [--repo <path>]
   chronicle queue add "<title>" [--jira KEY] [--prd NNNN/N] [--due DATE] [--repo <path>]
   chronicle queue done "<title-or-id>" [--repo <path>]
@@ -301,6 +316,11 @@ interface ParsedArgs {
   evaluatedAt?: string;
   perspective?: string;
   asOf?: string;
+  dataDir?: string;
+  scopeId?: string;
+  sourceFile?: string;
+  contentHash?: string;
+  once: boolean;
 }
 
 function parseArgs(argv: string[]): ParsedArgs {
@@ -310,6 +330,7 @@ function parseArgs(argv: string[]): ParsedArgs {
     dryRun: false,
     force: false,
     nodeIds: [],
+    once: false,
   };
 
   if (args.length === 0 || args[0] === '-h' || args[0] === '--help') {
@@ -506,6 +527,21 @@ function parseArgs(argv: string[]): ParsedArgs {
         break;
       case '--as-of':
         result.asOf = args[++i];
+        break;
+      case '--data-dir':
+        result.dataDir = args[++i];
+        break;
+      case '--scope':
+        result.scopeId = args[++i];
+        break;
+      case '--path':
+        result.sourceFile = args[++i];
+        break;
+      case '--hash':
+        result.contentHash = args[++i];
+        break;
+      case '--once':
+        result.once = true;
         break;
       case '-h':
       case '--help':
@@ -1264,6 +1300,102 @@ async function runCurrentUnderstanding(args: ParsedArgs): Promise<void> {
   }
 }
 
+async function runObserve(args: ParsedArgs): Promise<void> {
+  const dataDir = args.dataDir;
+  if (!dataDir) die('--data-dir <dir> is required');
+  const handler = getObserveHandler();
+  const cmd = args.command;
+  if (cmd === 'observe-init') {
+    if (!args.scopeId) die('--scope <id> is required for observe-init');
+    if (!args.sourceFile) die('--path <file> is required for observe-init');
+    const result = await handler.handle({
+      op: 'init',
+      dataDir,
+      scopeId: args.scopeId,
+      filePath: args.sourceFile,
+    });
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+  if (cmd === 'observe') {
+    if (!args.scopeId) die('--scope <id> is required for observe');
+    const result = await handler.handle({
+      op: 'observe',
+      dataDir,
+      scopeId: args.scopeId,
+    });
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+  if (cmd === 'watch') {
+    const tick = async (): Promise<void> => {
+      const result = await handler.handle({ op: 'watch-once', dataDir });
+      console.log(JSON.stringify(result, null, 2));
+    };
+    await tick();
+    if (args.once) return;
+    const intervalMs = 2000;
+    await new Promise<void>((resolve) => {
+      const timer = setInterval(() => {
+        void tick();
+      }, intervalMs);
+      const stop = (): void => {
+        clearInterval(timer);
+        resolve();
+      };
+      process.once('SIGINT', stop);
+      process.once('SIGTERM', stop);
+    });
+    return;
+  }
+  if (cmd === 'observe-stop') {
+    const result = await handler.handle({
+      op: 'stop',
+      dataDir,
+      scopeId: args.scopeId,
+    });
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+  if (cmd === 'observe-resume') {
+    const result = await handler.handle({
+      op: 'resume',
+      dataDir,
+      scopeId: args.scopeId,
+    });
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+  if (cmd === 'forget-scope') {
+    if (!args.scopeId) die('--scope <id> is required for forget-scope');
+    const result = await handler.handle({
+      op: 'forget-scope',
+      dataDir,
+      scopeId: args.scopeId,
+    });
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+  if (cmd === 'vault-status') {
+    const result = await handler.handle({ op: 'status', dataDir });
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+  if (cmd === 'vault-resolve') {
+    if (!args.contentHash) die('--hash <hex> is required for vault-resolve');
+    if (!args.outputDir)
+      die('--output <file> is required for vault-resolve');
+    const result = await handler.handle({
+      op: 'resolve',
+      dataDir,
+      contentHash: args.contentHash,
+      outputPath: args.outputDir,
+    });
+    console.log(JSON.stringify(result, null, 2));
+    if (!(result as { ok?: boolean }).ok) process.exit(1);
+  }
+}
+
 async function main(): Promise<void> {
   const args = parseArgs(process.argv);
 
@@ -1303,6 +1435,16 @@ async function main(): Promise<void> {
       break;
     case 'current-understanding':
       await runCurrentUnderstanding(args);
+      break;
+    case 'observe-init':
+    case 'observe':
+    case 'watch':
+    case 'observe-stop':
+    case 'observe-resume':
+    case 'forget-scope':
+    case 'vault-status':
+    case 'vault-resolve':
+      await runObserve(args);
       break;
     default:
       console.error(`chronicle: unknown command '${args.command}'\n`);

@@ -1188,3 +1188,75 @@ export interface QueueItem {
   /** Activity id (from the Chronicle sidecar) that closed it. */
   closedBy?: string;
 }
+
+/** V1 allowlisted file scope. Paths are locators, not identity. */
+export interface ObserveScope {
+  id: string;
+  kind: 'file';
+  path: string;
+  stopped: boolean;
+  forgotten: boolean;
+}
+
+/** Operator-controlled observe config. Lives beside the private vault. */
+export interface ObserveConfig {
+  version: 1;
+  stopped: boolean;
+  scopes: ObserveScope[];
+}
+
+/**
+ * Honest observation receipt. `capturedAt` is observe time, not authored
+ * event time. `contentHash` is artifact identity.
+ */
+export interface ObservationReceipt {
+  observationId: string;
+  scopeId: string;
+  sourceKind: 'file';
+  sourcePath: string;
+  capturedAt: string;
+  contentHash: string;
+  bytes: number;
+  clockClass: 'meta';
+  duplicate: boolean;
+}
+
+export type ObserveStatus =
+  | 'stored'
+  | 'duplicate'
+  | 'skipped-stopped'
+  | 'skipped-forgotten'
+  | 'missing-source';
+
+export interface ObserveFileResult {
+  status: ObserveStatus;
+  receipt?: ObservationReceipt;
+}
+
+export type ObserveCommand =
+  | {
+      op: 'init';
+      dataDir: string;
+      scopeId: string;
+      filePath: string;
+    }
+  | { op: 'observe'; dataDir: string; scopeId: string; capturedAt?: string }
+  | { op: 'watch-once'; dataDir: string; capturedAt?: string }
+  | { op: 'stop'; dataDir: string; scopeId?: string }
+  | { op: 'resume'; dataDir: string; scopeId?: string }
+  | { op: 'forget-scope'; dataDir: string; scopeId: string }
+  | { op: 'status'; dataDir: string }
+  | {
+      op: 'resolve';
+      dataDir: string;
+      contentHash: string;
+      outputPath: string;
+    };
+
+export interface ObserveVaultStatus {
+  stopped: boolean;
+  scopeCount: number;
+  objectCount: number;
+  receiptCount: number;
+  scopes: ObserveScope[];
+}

@@ -49,6 +49,8 @@ describe('chronicle CLI', () => {
     expect(result.stdout).toContain('interpret-source');
     expect(result.stdout).toContain('evaluate-derived');
     expect(result.stdout).toContain('current-understanding');
+    expect(result.stdout).toContain('observe-init');
+    expect(result.stdout).toContain('forget-scope');
   });
 
   it('inventory-chatgpt exits 1 without --export', () => {

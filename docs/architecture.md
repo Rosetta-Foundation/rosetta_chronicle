@@ -12,6 +12,15 @@ this path and is not authorized until it has a specimen.
 
 See [`../../rosetta_docs/process/chronicle-build-charter.md`](../../rosetta_docs/process/chronicle-build-charter.md).
 
+## V1 raw observe (allowlisted files)
+
+`ObserveHandler` → `ObserveService` → vault / config / receipt
+repositories. Explicit `--data-dir` and `--scope`. Copy-if-new into a
+private content-addressed vault. `watch --once` polls allowlisted
+files. `forget-scope` deletes Chronicle-owned copies for that scope
+only. Not Activity. Not a Capture Engine. Not a generalized daemon.
+OS disk encryption is the V1 at-rest boundary.
+
 ## Long-term data flow
 
 Chronicle sits between raw engineering activity (sources) and structured knowledge (consumers):
