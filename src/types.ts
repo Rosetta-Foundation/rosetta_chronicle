@@ -1189,10 +1189,10 @@ export interface QueueItem {
   closedBy?: string;
 }
 
-/** V1 allowlisted file scope. Paths are locators, not identity. */
+/** V1 allowlisted file or directory scope. Paths are locators, not identity. */
 export interface ObserveScope {
   id: string;
-  kind: 'file';
+  kind: 'file' | 'directory';
   path: string;
   stopped: boolean;
   forgotten: boolean;
@@ -1231,6 +1231,11 @@ export type ObserveStatus =
 export interface ObserveFileResult {
   status: ObserveStatus;
   receipt?: ObservationReceipt;
+}
+
+export interface ObserveRun {
+  scopeId: string;
+  results: ObserveFileResult[];
 }
 
 export type ObserveCommand =

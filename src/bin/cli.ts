@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import 'reflect-metadata';
+import { readFileSync } from 'fs';
 import {
   getDailyChronicleHandler,
   getChatGptInventoryHandler,
@@ -26,7 +27,7 @@ import {
 } from '../types';
 import { parseProvenanceFrom } from '../utils/provenance-graph.utils';
 import { redactCurrentUnderstandingView } from '../utils/current-understanding.utils';
-import { readFileSync } from 'fs';
+import { summarizeObserveResults } from '../utils/observe-files.utils';
 import { describeDropped, ClobberCheck } from '../utils/clobber.utils';
 import {
   formatQueueSummary,
@@ -53,8 +54,8 @@ import { CHRONICLE_TOKENS } from '../tokens';
  *   chronicle interpret-source    Machine interpretation with provenance (E4).
  *   chronicle evaluate-derived    Append-only human evaluation of a derived record.
  *   chronicle current-understanding  Read-only view over interpretation history.
- *   chronicle observe-init   Allowlist a file scope beside a private vault.
- *   chronicle observe        Observe one allowlisted file (hash, copy-if-new).
+ *   chronicle observe-init   Allowlist a file or directory beside a private vault.
+ *   chronicle observe        Observe allowlisted files (hash, copy-if-new).
  *   chronicle watch          Poll allowlisted scopes once (--once) or until SIGINT.
  *   chronicle observe-stop / observe-resume
  *   chronicle forget-scope   V1 scope-only forget of Chronicle-owned copies.
@@ -83,7 +84,7 @@ Usage:
   chronicle interpret-source --type candidate-observation --export <path> --graph <file> --source-graph-hash <hex> --conversation-id <id> --node-id <id> --output <dir> --executions <dir> --definitions <dir> --occurrences <dir> --provider <name> --model <id> [--dry-run]
   chronicle evaluate-derived --derived <id> --evaluator-name <name> [--evidence-support supported|not-supported|uncertain] [--personal-recognition recognized|rejected|uncertain] --evaluations <dir> --output <dir> [--dry-run]
   chronicle current-understanding --output <dir> --evaluations <dir> (--evaluator-name <name> | --perspective all) [--as-of <iso>]
-  chronicle observe-init --data-dir <dir> --scope <id> --path <file>
+  chronicle observe-init --data-dir <dir> --scope <id> --path <file-or-dir>
   chronicle observe --data-dir <dir> --scope <id>
   chronicle watch --data-dir <dir> [--once]
   chronicle observe-stop --data-dir <dir> [--scope <id>]
@@ -144,6 +145,16 @@ Commands:
                       T, not what Chronicle knew at T. Default stdout
                       redacts conversation/node ids and prose. Does not
                       write or invoke a model.
+  observe-init        Allowlist a file or directory for V1 raw observe.
+                      Does not copy bytes yet. Does not emit Activity.
+  observe             Hash and copy-if-new every file under one scope.
+                      Default stdout is counts, not paths. Not Activity.
+  watch               Poll allowlisted scopes. --once is a single pass.
+  observe-stop / observe-resume
+                      Operator STOP for a scope or the whole data-dir.
+  forget-scope        Delete Chronicle-owned copies for that scope only.
+  vault-status        Counts and scope flags for a private data-dir.
+  vault-resolve       Copy one vault object out by content hash.
 
 Options:
   --repo <path>       Absolute path to your personal Chronicle repo.
@@ -190,6 +201,13 @@ Options:
                       --evaluator-name.
   --as-of <iso>       Effective event-time cutoff for
                       current-understanding. Not known-at-T.
+  --data-dir <dir>    Private observe vault + receipts (operator-local).
+  --scope <id>        Allowlist scope id for observe commands.
+  --path <file-or-dir>
+                      Source to allowlist (observe-init). Directory walks
+                      that tree only; escaping symlinks are skipped.
+  --hash <hex>        Vault object content hash (vault-resolve).
+  --once              Single watch pass; do not poll.
   --source-graph-hash <hex>
                       Archive content hash the derived record cites.
   --source-ref <hex>  Alias for --source-graph-hash.
@@ -929,10 +947,8 @@ async function runRecordDerived(args: ParsedArgs): Promise<void> {
   if (!args.sourceGraphHash)
     die('--source-graph-hash is required for record-derived');
   if (!args.transformationType) die('--type is required for record-derived');
-  if (!args.producerType)
-    die('--producer-type is required for record-derived');
-  if (!args.producerName)
-    die('--producer-name is required for record-derived');
+  if (!args.producerType) die('--producer-type is required for record-derived');
+  if (!args.producerName) die('--producer-name is required for record-derived');
   let content = args.content;
   if (args.contentFile) {
     content = readFileSync(args.contentFile, 'utf-8');
@@ -984,7 +1000,9 @@ async function runTransformRecord(args: ParsedArgs): Promise<void> {
       '--definitions <dir> (or $CHRONICLE_DEFINITION_DIR) is required for transform-record',
     );
   if (!args.sourceGraphHash)
-    die('--source-graph-hash (or --source-ref) is required for transform-record');
+    die(
+      '--source-graph-hash (or --source-ref) is required for transform-record',
+    );
   if (!args.transformationType) die('--type is required for transform-record');
   if (!args.producerType)
     die('--producer-type is required for transform-record');
@@ -1080,7 +1098,9 @@ async function runProvenance(args: ParsedArgs): Promise<void> {
   if (!parsed.ref) die(parsed.error ?? 'from-unparseable');
   const outputDir = args.outputDir ?? process.env['CHRONICLE_DERIVED_DIR'];
   if (!outputDir)
-    die('--output <dir> (or $CHRONICLE_DERIVED_DIR) is required for provenance');
+    die(
+      '--output <dir> (or $CHRONICLE_DERIVED_DIR) is required for provenance',
+    );
   const executionsDir =
     args.executionsDir ?? process.env['CHRONICLE_EXECUTION_DIR'];
   if (!executionsDir)
@@ -1093,8 +1113,7 @@ async function runProvenance(args: ParsedArgs): Promise<void> {
     die(
       '--definitions <dir> (or $CHRONICLE_DEFINITION_DIR) is required for provenance',
     );
-  const graphsDir =
-    args.graphsDir ?? process.env['CHRONICLE_SOURCE_GRAPH_DIR'];
+  const graphsDir = args.graphsDir ?? process.env['CHRONICLE_SOURCE_GRAPH_DIR'];
   if (!graphsDir)
     die(
       '--graphs <dir> (or $CHRONICLE_SOURCE_GRAPH_DIR) is required for provenance',
@@ -1124,10 +1143,14 @@ async function runProvenance(args: ParsedArgs): Promise<void> {
 
 async function runInterpretSource(args: ParsedArgs): Promise<void> {
   if (args.reviewState) {
-    die('interpret-source does not accept --review-state; output is unreviewed');
+    die(
+      'interpret-source does not accept --review-state; output is unreviewed',
+    );
   }
   if (args.content != null || args.contentFile) {
-    die('interpret-source does not accept --content; the model produces output');
+    die(
+      'interpret-source does not accept --content; the model produces output',
+    );
   }
   const type = args.transformationType ?? 'candidate-observation';
   if (type !== 'candidate-observation') {
@@ -1307,7 +1330,8 @@ async function runObserve(args: ParsedArgs): Promise<void> {
   const cmd = args.command;
   if (cmd === 'observe-init') {
     if (!args.scopeId) die('--scope <id> is required for observe-init');
-    if (!args.sourceFile) die('--path <file> is required for observe-init');
+    if (!args.sourceFile)
+      die('--path <file-or-dir> is required for observe-init');
     const result = await handler.handle({
       op: 'init',
       dataDir,
@@ -1319,18 +1343,42 @@ async function runObserve(args: ParsedArgs): Promise<void> {
   }
   if (cmd === 'observe') {
     if (!args.scopeId) die('--scope <id> is required for observe');
-    const result = await handler.handle({
+    const result = (await handler.handle({
       op: 'observe',
       dataDir,
       scopeId: args.scopeId,
-    });
-    console.log(JSON.stringify(result, null, 2));
+    })) as {
+      scopeId: string;
+      results: { status: string; receipt?: { bytes: number } }[];
+    };
+    console.log(
+      JSON.stringify(
+        { scopeId: result.scopeId, ...summarizeObserveResults(result.results) },
+        null,
+        2,
+      ),
+    );
     return;
   }
   if (cmd === 'watch') {
     const tick = async (): Promise<void> => {
-      const result = await handler.handle({ op: 'watch-once', dataDir });
-      console.log(JSON.stringify(result, null, 2));
+      const runs = (await handler.handle({
+        op: 'watch-once',
+        dataDir,
+      })) as {
+        scopeId: string;
+        results: { status: string; receipt?: { bytes: number } }[];
+      }[];
+      console.log(
+        JSON.stringify(
+          runs.map((run) => ({
+            scopeId: run.scopeId,
+            ...summarizeObserveResults(run.results),
+          })),
+          null,
+          2,
+        ),
+      );
     };
     await tick();
     if (args.once) return;
@@ -1383,8 +1431,7 @@ async function runObserve(args: ParsedArgs): Promise<void> {
   }
   if (cmd === 'vault-resolve') {
     if (!args.contentHash) die('--hash <hex> is required for vault-resolve');
-    if (!args.outputDir)
-      die('--output <file> is required for vault-resolve');
+    if (!args.outputDir) die('--output <file> is required for vault-resolve');
     const result = await handler.handle({
       op: 'resolve',
       dataDir,
