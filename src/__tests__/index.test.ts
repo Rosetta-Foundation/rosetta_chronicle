@@ -9,6 +9,7 @@ import {
   getProvenanceHandler,
   getInterpretHandler,
   getEvaluateHandler,
+  getChatGptConversationViewHandler,
   getObserveHandler,
 } from '../index';
 import { CHRONICLE_TOKENS } from '../tokens';
@@ -96,6 +97,14 @@ describe('getInterpretHandler', () => {
 describe('getEvaluateHandler', () => {
   it('resolves the evaluate handler with its dependency graph', () => {
     const handler = getEvaluateHandler();
+    expect(handler).toBeDefined();
+    expect(typeof handler.handle).toBe('function');
+  });
+});
+
+describe('getChatGptConversationViewHandler', () => {
+  it('resolves the conversation-view handler with its dependency graph', () => {
+    const handler = getChatGptConversationViewHandler();
     expect(handler).toBeDefined();
     expect(typeof handler.handle).toBe('function');
   });

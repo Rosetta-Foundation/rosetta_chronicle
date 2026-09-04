@@ -49,6 +49,7 @@ describe('chronicle CLI', () => {
     expect(result.stdout).toContain('interpret-source');
     expect(result.stdout).toContain('evaluate-derived');
     expect(result.stdout).toContain('current-understanding');
+    expect(result.stdout).toContain('chatgpt-conversation-view');
     expect(result.stdout).toContain('observe-init');
     expect(result.stdout).toContain('forget-scope');
   });
@@ -416,6 +417,19 @@ describe('chronicle CLI', () => {
       rmSync(defs, { recursive: true, force: true });
       rmSync(occs, { recursive: true, force: true });
     }
+  });
+
+  it('chatgpt-conversation-view exits 1 without --graphs', () => {
+    const result = spawnSync(
+      process.execPath,
+      [CLI, 'chatgpt-conversation-view'],
+      {
+        encoding: 'utf-8',
+        env: { ...process.env, CHRONICLE_SOURCE_GRAPH_DIR: undefined },
+      },
+    );
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('--graphs');
   });
 
   it('current-understanding exits 1 without a perspective', () => {

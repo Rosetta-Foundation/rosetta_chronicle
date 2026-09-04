@@ -18,6 +18,9 @@ export const CHRONICLE_TOKENS = {
   InterpretHandler: Symbol.for('InterpretHandler'),
   EvaluateHandler: Symbol.for('EvaluateHandler'),
   CurrentUnderstandingHandler: Symbol.for('CurrentUnderstandingHandler'),
+  ChatGptConversationViewHandler: Symbol.for(
+    'ChatGptConversationViewHandler',
+  ),
   ObserveHandler: Symbol.for('ObserveHandler'),
 
   // Services
@@ -30,6 +33,9 @@ export const CHRONICLE_TOKENS = {
   InterpretationService: Symbol.for('InterpretationService'),
   EvaluationService: Symbol.for('EvaluationService'),
   CurrentUnderstandingService: Symbol.for('CurrentUnderstandingService'),
+  ChatGptConversationViewService: Symbol.for(
+    'ChatGptConversationViewService',
+  ),
   ObserveService: Symbol.for('ObserveService'),
 
   // Repositories (one per source)

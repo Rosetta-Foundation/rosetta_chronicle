@@ -438,6 +438,69 @@ export interface ChatGptImportResult {
   error?: string;
 }
 
+/**
+ * Mechanical comparison of one conversation across source-graph
+ * snapshots. Not a judgment of significance.
+ */
+export type ConversationChangeKind =
+  | 'new-in-latest'
+  | 'absent-from-latest'
+  | 'grew'
+  | 'shrank'
+  | 'tip-moved'
+  | 'unchanged';
+
+export type ConversationViewStatus =
+  | 'ok'
+  | 'partial'
+  | 'not-found'
+  | 'invalid';
+
+/** One archive appearance of a vendor conversation. Topology only. */
+export interface ConversationArchiveAppearance {
+  contentHash: string;
+  importedAt: string;
+  nodeCount: number;
+  messageNodeCount: number;
+  currentNodeId?: string;
+  archived: boolean;
+  updateTime?: string;
+}
+
+/**
+ * Rebuildable row keyed by vendor conversation id. No title, text,
+ * or interpretation.
+ */
+export interface ConversationViewRow {
+  sourceId: string;
+  archives: ConversationArchiveAppearance[];
+  firstSeenArchive: string;
+  latestArchive: string;
+  nodeDelta: number;
+  attachmentRefCount: number;
+  missingAttachmentCount: number;
+  changeKind: ConversationChangeKind;
+}
+
+/**
+ * Read-only conversation-level view over source-graph snapshots.
+ * Rebuildable. Not canonical evidence. Not Activity.
+ */
+export interface ConversationView {
+  status: ConversationViewStatus;
+  generatedAt: string;
+  archiveCount: number;
+  conversationCount: number;
+  changeKinds: Record<ConversationChangeKind, number>;
+  conversations: ConversationViewRow[];
+  failures: StoreInventoryFailure[];
+}
+
+export interface ConversationViewInput {
+  graphsDir: string;
+  generatedAt?: string;
+}
+
 // ─── Derived records (PRD-0027 transformation layer) ─────────────────────────
 
 /**

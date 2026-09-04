@@ -35,6 +35,10 @@ import {
   CurrentUnderstandingHandler,
 } from './current-understanding.handler';
 import {
+  IChatGptConversationViewHandler,
+  ChatGptConversationViewHandler,
+} from './chatgpt-conversation-view.handler';
+import {
   IChronicleService,
   ChronicleService,
 } from './services/chronicle.service';
@@ -70,6 +74,10 @@ import {
   ICurrentUnderstandingService,
   CurrentUnderstandingService,
 } from './services/current-understanding.service';
+import {
+  IChatGptConversationViewService,
+  ChatGptConversationViewService,
+} from './services/chatgpt-conversation-view.service';
 import { IGitRepository, GitRepository } from './repositories/git.repository';
 import {
   IGitDiscoveryRepository,
@@ -282,6 +290,11 @@ export const buildContainer = (): Container => {
     )
     .to(CurrentUnderstandingService);
   container
+    .bind<IChatGptConversationViewService>(
+      CHRONICLE_TOKENS.ChatGptConversationViewService,
+    )
+    .to(ChatGptConversationViewService);
+  container
     .bind<IObserveService>(CHRONICLE_TOKENS.ObserveService)
     .to(ObserveService);
 
@@ -315,6 +328,11 @@ export const buildContainer = (): Container => {
       CHRONICLE_TOKENS.CurrentUnderstandingHandler,
     )
     .to(CurrentUnderstandingHandler);
+  container
+    .bind<IChatGptConversationViewHandler>(
+      CHRONICLE_TOKENS.ChatGptConversationViewHandler,
+    )
+    .to(ChatGptConversationViewHandler);
   container
     .bind<IObserveHandler>(CHRONICLE_TOKENS.ObserveHandler)
     .to(ObserveHandler);
@@ -383,6 +401,14 @@ export const getCurrentUnderstandingHandler =
   (): ICurrentUnderstandingHandler => {
     return buildContainer().get<ICurrentUnderstandingHandler>(
       CHRONICLE_TOKENS.CurrentUnderstandingHandler,
+    );
+  };
+
+/** Resolve the ChatGPT conversation-view handler from a fresh container. */
+export const getChatGptConversationViewHandler =
+  (): IChatGptConversationViewHandler => {
+    return buildContainer().get<IChatGptConversationViewHandler>(
+      CHRONICLE_TOKENS.ChatGptConversationViewHandler,
     );
   };
 

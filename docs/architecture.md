@@ -146,6 +146,14 @@ probes on that same machinery (genuine longitudinal revision not
 yet observed) — not a ninth handler
 (`docs/design/revision-experiment.md`).
 
+ChatGPT conversation view is a ninth handler:
+`ChatGptConversationViewHandler` → `ChatGptConversationViewService` →
+`ChatGptGraphStore.listResolved`. It computes a read-only
+conversation-level projection over existing source-graph snapshots.
+It does not write, invoke a model, merge archives, read vault bytes,
+or persist an index. The projection is rebuildable and not canonical
+evidence. See `docs/design/chatgpt-conversation-view.md`.
+
 ### Dependency direction
 
 ```

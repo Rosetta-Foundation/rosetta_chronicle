@@ -11,6 +11,7 @@ import {
   getInterpretHandler,
   getEvaluateHandler,
   getCurrentUnderstandingHandler,
+  getChatGptConversationViewHandler,
   getObserveHandler,
   buildContainer,
 } from '../index';
@@ -27,6 +28,7 @@ import {
 } from '../types';
 import { parseProvenanceFrom } from '../utils/provenance-graph.utils';
 import { redactCurrentUnderstandingView } from '../utils/current-understanding.utils';
+import { redactConversationView } from '../utils/chatgpt-conversation-view.utils';
 import { summarizeObserveResults } from '../utils/observe-files.utils';
 import { describeDropped, ClobberCheck } from '../utils/clobber.utils';
 import {
@@ -54,6 +56,7 @@ import { CHRONICLE_TOKENS } from '../tokens';
  *   chronicle interpret-source    Machine interpretation with provenance (E4).
  *   chronicle evaluate-derived    Append-only human evaluation of a derived record.
  *   chronicle current-understanding  Read-only view over interpretation history.
+ *   chronicle chatgpt-conversation-view  Read-only conversation projection.
  *   chronicle observe-init   Allowlist a file or directory beside a private vault.
  *   chronicle observe        Observe allowlisted files (hash, copy-if-new).
  *   chronicle watch          Poll allowlisted scopes once (--once) or until SIGINT.
@@ -84,6 +87,7 @@ Usage:
   chronicle interpret-source --type candidate-observation --export <path> --graph <file> --source-graph-hash <hex> --conversation-id <id> --node-id <id> --output <dir> --executions <dir> --definitions <dir> --occurrences <dir> --provider <name> --model <id> [--dry-run]
   chronicle evaluate-derived --derived <id> --evaluator-name <name> [--evidence-support supported|not-supported|uncertain] [--personal-recognition recognized|rejected|uncertain] --evaluations <dir> --output <dir> [--dry-run]
   chronicle current-understanding --output <dir> --evaluations <dir> (--evaluator-name <name> | --perspective all) [--as-of <iso>]
+  chronicle chatgpt-conversation-view --graphs <dir> [--show-conversation-ids]
   chronicle observe-init --data-dir <dir> --scope <id> --path <file-or-dir>
   chronicle observe --data-dir <dir> --scope <id>
   chronicle watch --data-dir <dir> [--once]
@@ -145,6 +149,12 @@ Commands:
                       T, not what Chronicle knew at T. Default stdout
                       redacts conversation/node ids and prose. Does not
                       write or invoke a model.
+  chatgpt-conversation-view
+                      Read-only conversation-level projection over
+                      ChatGPT source-graph snapshots. Rebuildable; not
+                      canonical evidence. Default stdout is aggregates
+                      only. --show-conversation-ids includes vendor ids.
+                      Does not write or invoke a model.
   observe-init        Allowlist a file or directory for V1 raw observe.
                       Does not copy bytes yet. Does not emit Activity.
   observe             Hash and copy-if-new every file under one scope.
@@ -192,6 +202,10 @@ Options:
                       Falls back to $CHRONICLE_OCCURRENCE_DIR.
   --graphs <dir>      Directory of source-graph JSON files.
                       Falls back to $CHRONICLE_SOURCE_GRAPH_DIR.
+  --show-conversation-ids
+                      Include vendor conversation ids on
+                      chatgpt-conversation-view stdout. Default omits
+                      them so aggregates are safe to paste.
   --from <kind>:<id>  Start of chronicle provenance (derived-record,
                       execution, definition, source-archive,
                       source-conversation, source-node).
@@ -252,7 +266,7 @@ Environment variables:
   CHRONICLE_CALENDAR  Default value for --calendar (path to .ics export).
   CHRONICLE_SOURCE_GRAPH_DIR
                       Default --output for import-chatgpt and --graphs
-                      for provenance.
+                      for provenance and chatgpt-conversation-view.
   CHRONICLE_DERIVED_DIR
                       Default --output for record-derived,
                       transform-record, evaluate-derived,
@@ -339,6 +353,7 @@ interface ParsedArgs {
   sourceFile?: string;
   contentHash?: string;
   once: boolean;
+  showConversationIds: boolean;
 }
 
 function parseArgs(argv: string[]): ParsedArgs {
@@ -349,6 +364,7 @@ function parseArgs(argv: string[]): ParsedArgs {
     force: false,
     nodeIds: [],
     once: false,
+    showConversationIds: false,
   };
 
   if (args.length === 0 || args[0] === '-h' || args[0] === '--help') {
@@ -560,6 +576,9 @@ function parseArgs(argv: string[]): ParsedArgs {
         break;
       case '--once':
         result.once = true;
+        break;
+      case '--show-conversation-ids':
+        result.showConversationIds = true;
         break;
       case '-h':
       case '--help':
@@ -1323,6 +1342,24 @@ async function runCurrentUnderstanding(args: ParsedArgs): Promise<void> {
   }
 }
 
+async function runChatGptConversationView(args: ParsedArgs): Promise<void> {
+  const graphsDir = args.graphsDir ?? process.env['CHRONICLE_SOURCE_GRAPH_DIR'];
+  if (!graphsDir) {
+    die(
+      '--graphs <dir> (or $CHRONICLE_SOURCE_GRAPH_DIR) is required for chatgpt-conversation-view',
+    );
+  }
+  const handler = getChatGptConversationViewHandler();
+  const result = await handler.handle({ graphsDir });
+  const printed = args.showConversationIds
+    ? result
+    : redactConversationView(result);
+  console.log(JSON.stringify(printed, null, 2));
+  if (result.status === 'invalid' || result.status === 'not-found') {
+    process.exit(1);
+  }
+}
+
 async function runObserve(args: ParsedArgs): Promise<void> {
   const dataDir = args.dataDir;
   if (!dataDir) die('--data-dir <dir> is required');
@@ -1482,6 +1519,9 @@ async function main(): Promise<void> {
       break;
     case 'current-understanding':
       await runCurrentUnderstanding(args);
+      break;
+    case 'chatgpt-conversation-view':
+      await runChatGptConversationView(args);
       break;
     case 'observe-init':
     case 'observe':
