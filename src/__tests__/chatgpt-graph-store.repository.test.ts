@@ -1,4 +1,10 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'fs';
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'fs';
 import { tmpdir } from 'os';
 import path from 'path';
 import { ChatGptGraphStore } from '../repositories/chatgpt-graph-store.repository';
@@ -80,5 +86,30 @@ describe('ChatGptGraphStore', () => {
       }),
     ).rejects.toThrow(/invalid content hash/);
     expect(await store.read(repoDir, '../escape')).toBeNull();
+  });
+
+  it('listResolved reports a corrupt sibling as a failure', async () => {
+    const store = new ChatGptGraphStore();
+    await store.write(repoDir, graph('2026-08-17T21:00:00.000Z'));
+    const bad = 'b'.repeat(64);
+    writeFileSync(path.join(repoDir, `${bad}.json`), '{not-json');
+    writeFileSync(path.join(repoDir, 'notes.txt'), 'ignore');
+    writeFileSync(path.join(repoDir, 'not-a-hash.json'), '{"archive":{}}');
+    const inventory = await store.listResolved(repoDir);
+    expect(inventory.present).toBe(true);
+    expect(inventory.records).toHaveLength(1);
+    expect(inventory.records[0].archive.contentHash).toBe(HASH);
+    expect(inventory.failures.map((row) => row.filename).sort()).toEqual([
+      `${bad}.json`,
+      'not-a-hash.json',
+    ]);
+  });
+
+  it('listResolved marks a missing directory as absent', async () => {
+    const store = new ChatGptGraphStore();
+    const inventory = await store.listResolved(
+      path.join(repoDir, 'missing-graphs'),
+    );
+    expect(inventory).toEqual({ present: false, records: [], failures: [] });
   });
 });

@@ -1,7 +1,13 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  writeFileSync,
+} from 'fs';
 import path from 'path';
 import { injectable } from 'inversify';
-import { ChatGptSourceGraph } from '../types';
+import { ChatGptSourceGraph, StoreInventory } from '../types';
 
 /**
  * Persistence adapter for a normalized ChatGPT conversation graph.
@@ -31,9 +37,29 @@ export interface IChatGptGraphStore {
     outputDir: string,
     contentHash: string,
   ): Promise<GraphResolveStatus>;
+  /**
+   * Enumerate valid source graphs and structurally invalid siblings.
+   * `read` remains the valid-only helper. Conversation view must use
+   * this so `ok` is not claimed over silent corruption.
+   */
+  listResolved(outputDir: string): Promise<StoreInventory<ChatGptSourceGraph>>;
 }
 
 const CONTENT_HASH = /^[a-f0-9]{64}$/;
+
+const isSourceGraph = (value: unknown): value is ChatGptSourceGraph => {
+  if (!value || typeof value !== 'object') return false;
+  const rec = value as Record<string, unknown>;
+  const archive = rec.archive;
+  if (!archive || typeof archive !== 'object') return false;
+  const a = archive as Record<string, unknown>;
+  return (
+    typeof a.contentHash === 'string' &&
+    CONTENT_HASH.test(a.contentHash) &&
+    typeof a.importedAt === 'string' &&
+    Array.isArray(rec.conversations)
+  );
+};
 
 /**
  * Filesystem implementation of {@link IChatGptGraphStore}.
@@ -58,7 +84,8 @@ export class ChatGptGraphStore implements IChatGptGraphStore {
     const absPath = this.pathFor(outputDir, contentHash);
     if (!existsSync(absPath)) return null;
     try {
-      return JSON.parse(readFileSync(absPath, 'utf-8')) as ChatGptSourceGraph;
+      const parsed: unknown = JSON.parse(readFileSync(absPath, 'utf-8'));
+      return isSourceGraph(parsed) ? parsed : null;
     } catch {
       return null;
     }
@@ -92,9 +119,38 @@ export class ChatGptGraphStore implements IChatGptGraphStore {
   async readAt(filePath: string): Promise<ChatGptSourceGraph | null> {
     if (!filePath || !existsSync(filePath)) return null;
     try {
-      return JSON.parse(readFileSync(filePath, 'utf-8')) as ChatGptSourceGraph;
+      const parsed: unknown = JSON.parse(readFileSync(filePath, 'utf-8'));
+      return isSourceGraph(parsed) ? parsed : null;
     } catch {
       return null;
     }
+  }
+
+  /** @inheritDoc */
+  async listResolved(
+    outputDir: string,
+  ): Promise<StoreInventory<ChatGptSourceGraph>> {
+    if (!existsSync(outputDir)) {
+      return { present: false, records: [], failures: [] };
+    }
+    const records: ChatGptSourceGraph[] = [];
+    const failures: StoreInventory<ChatGptSourceGraph>['failures'] = [];
+    for (const name of readdirSync(outputDir).sort()) {
+      if (!name.endsWith('.json')) continue;
+      const id = name.slice(0, -'.json'.length);
+      const record = CONTENT_HASH.test(id)
+        ? await this.read(outputDir, id)
+        : null;
+      if (record && record.archive.contentHash === id) {
+        records.push(record);
+        continue;
+      }
+      failures.push({
+        filename: name,
+        ...(CONTENT_HASH.test(id) ? { id } : {}),
+        status: 'invalid',
+      });
+    }
+    return { present: true, records, failures };
   }
 }
