@@ -154,7 +154,10 @@ ChatGPT conversation view is a ninth handler:
 conversation-level projection over existing source-graph snapshots.
 It does not write, invoke a model, merge archives, read vault bytes,
 or persist an index. The projection is rebuildable and not canonical
-evidence. See `docs/design/chatgpt-conversation-view.md`.
+evidence. `chatgpt-conversation-locate` looks up one vendor id and
+names the graph snapshot files (not vault objects). `chronicle start`
+is the V1 turn-on alias for `watch`. See
+`docs/design/chatgpt-conversation-view.md`.
 
 ### Dependency direction
 

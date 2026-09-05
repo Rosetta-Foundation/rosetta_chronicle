@@ -5,7 +5,6 @@ import { join } from 'path';
  * Product default for observe vault + receipts.
  *
  * Operator-chosen `--data-dir` and `$CHRONICLE_DATA_DIR` win.
- * Existing pilot directories are not migrated.
  */
 export const defaultChronicleDataDir = (home = homedir()): string =>
   join(home, '.local', 'share', 'rosetta', 'chronicle', 'default');
@@ -19,3 +18,16 @@ export const resolveChronicleDataDir = (
   env: NodeJS.Dict<string | undefined> = process.env,
   home = homedir(),
 ): string => explicit ?? env['CHRONICLE_DATA_DIR'] ?? defaultChronicleDataDir(home);
+
+/**
+ * Source-graph directory: `--graphs`, then `$CHRONICLE_SOURCE_GRAPH_DIR`,
+ * then `<data-dir>/graphs`.
+ */
+export const resolveChronicleGraphsDir = (
+  explicit?: string,
+  env: NodeJS.Dict<string | undefined> = process.env,
+  home = homedir(),
+): string =>
+  explicit ??
+  env['CHRONICLE_SOURCE_GRAPH_DIR'] ??
+  join(resolveChronicleDataDir(undefined, env, home), 'graphs');

@@ -1,8 +1,10 @@
+import { join } from 'path';
 import {
   ChatGptSourceConversation,
   ChatGptSourceGraph,
   ConversationArchiveAppearance,
   ConversationChangeKind,
+  ConversationLocateView,
   ConversationView,
   ConversationViewRow,
   ConversationViewStatus,
@@ -186,5 +188,34 @@ export const projectConversationView = (input: {
     changeKinds,
     conversations,
     failures: input.inventory.failures,
+  };
+};
+
+/**
+ * Pick one vendor conversation from a projected view. Missing id is
+ * `not-found` even when the graphs directory is `ok`. Graph file paths
+ * are snapshots, not vault objects.
+ */
+export const locateConversation = (
+  view: ConversationView,
+  sourceId: string,
+  graphsDir: string,
+): ConversationLocateView => {
+  const conversation = view.conversations.find(
+    (row) => row.sourceId === sourceId,
+  );
+  const graphFiles = (conversation?.archives ?? []).map((archive) => ({
+    contentHash: archive.contentHash,
+    path: join(graphsDir, `${archive.contentHash}.json`),
+  }));
+  const status =
+    view.status === 'ok' && !conversation ? 'not-found' : view.status;
+  return {
+    status,
+    generatedAt: view.generatedAt,
+    sourceId,
+    ...(conversation ? { conversation } : {}),
+    graphFiles,
+    failures: view.failures,
   };
 };

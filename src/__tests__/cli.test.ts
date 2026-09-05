@@ -50,6 +50,8 @@ describe('chronicle CLI', () => {
     expect(result.stdout).toContain('evaluate-derived');
     expect(result.stdout).toContain('current-understanding');
     expect(result.stdout).toContain('chatgpt-conversation-view');
+    expect(result.stdout).toContain('chatgpt-conversation-locate');
+    expect(result.stdout).toContain('chronicle start');
     expect(result.stdout).toContain('observe-init');
     expect(result.stdout).toContain('forget-scope');
     expect(result.stdout).toContain('chronicle version');
@@ -450,17 +452,38 @@ describe('chronicle CLI', () => {
     }
   });
 
-  it('chatgpt-conversation-view exits 1 without --graphs', () => {
+  it('chatgpt-conversation-view uses <data-dir>/graphs when --graphs is omitted', () => {
+    const home = mkdtempSync(join(tmpdir(), 'cli-view-home-'));
+    try {
+      const result = spawnSync(
+        process.execPath,
+        [CLI, 'chatgpt-conversation-view'],
+        {
+          encoding: 'utf-8',
+          env: {
+            ...process.env,
+            HOME: home,
+            CHRONICLE_SOURCE_GRAPH_DIR: undefined,
+            CHRONICLE_DATA_DIR: undefined,
+          },
+        },
+      );
+      expect(result.status).toBe(1);
+      const parsed = JSON.parse(result.stdout) as { status: string };
+      expect(parsed.status).toBe('not-found');
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  it('chatgpt-conversation-locate exits 1 without --conversation-id', () => {
     const result = spawnSync(
       process.execPath,
-      [CLI, 'chatgpt-conversation-view'],
-      {
-        encoding: 'utf-8',
-        env: { ...process.env, CHRONICLE_SOURCE_GRAPH_DIR: undefined },
-      },
+      [CLI, 'chatgpt-conversation-locate'],
+      { encoding: 'utf-8' },
     );
     expect(result.status).toBe(1);
-    expect(result.stderr).toContain('--graphs');
+    expect(result.stderr).toContain('--conversation-id');
   });
 
   it('current-understanding exits 1 without a perspective', () => {
