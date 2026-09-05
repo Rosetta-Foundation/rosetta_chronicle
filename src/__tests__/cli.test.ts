@@ -52,6 +52,37 @@ describe('chronicle CLI', () => {
     expect(result.stdout).toContain('chatgpt-conversation-view');
     expect(result.stdout).toContain('observe-init');
     expect(result.stdout).toContain('forget-scope');
+    expect(result.stdout).toContain('chronicle version');
+  });
+
+  it('prints the package version with --version and version', () => {
+    const pkg = JSON.parse(
+      readFileSync(join(__dirname, '../../package.json'), 'utf-8'),
+    ) as { version: string };
+    for (const args of [['--version'], ['version']] as const) {
+      const result = spawnSync(process.execPath, [CLI, ...args], {
+        encoding: 'utf-8',
+      });
+      expect(result.status).toBe(0);
+      expect(result.stdout.trim()).toBe(pkg.version);
+    }
+  });
+
+  it('vault-status uses the default data-dir when --data-dir is omitted', () => {
+    const home = mkdtempSync(join(tmpdir(), 'cli-home-'));
+    try {
+      const result = spawnSync(process.execPath, [CLI, 'vault-status'], {
+        encoding: 'utf-8',
+        env: { ...process.env, HOME: home, CHRONICLE_DATA_DIR: undefined },
+      });
+      expect(result.status).toBe(1);
+      expect(result.stderr).not.toContain('--data-dir <dir> is required');
+      expect(result.stderr).toContain(
+        join(home, '.local', 'share', 'rosetta', 'chronicle', 'default'),
+      );
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+    }
   });
 
   it('inventory-chatgpt exits 1 without --export', () => {

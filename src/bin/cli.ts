@@ -30,6 +30,11 @@ import { parseProvenanceFrom } from '../utils/provenance-graph.utils';
 import { redactCurrentUnderstandingView } from '../utils/current-understanding.utils';
 import { redactConversationView } from '../utils/chatgpt-conversation-view.utils';
 import { summarizeObserveResults } from '../utils/observe-files.utils';
+import { resolveChronicleDataDir } from '../utils/chronicle-paths.utils';
+import {
+  packageRootFromDist,
+  readCliVersion,
+} from '../utils/cli-version.utils';
 import { describeDropped, ClobberCheck } from '../utils/clobber.utils';
 import {
   formatQueueSummary,
@@ -63,6 +68,7 @@ import { CHRONICLE_TOKENS } from '../tokens';
  *   chronicle observe-stop / observe-resume
  *   chronicle forget-scope   V1 scope-only forget of Chronicle-owned copies.
  *   chronicle vault-status / vault-resolve
+ *   chronicle version   Print the engine CLI version.
  *
  * Daily Chronicle commands (backfill, append-session) are **deprecated /
  * frozen v0.1**. They remain for historical record. Do not use them for
@@ -88,14 +94,15 @@ Usage:
   chronicle evaluate-derived --derived <id> --evaluator-name <name> [--evidence-support supported|not-supported|uncertain] [--personal-recognition recognized|rejected|uncertain] --evaluations <dir> --output <dir> [--dry-run]
   chronicle current-understanding --output <dir> --evaluations <dir> (--evaluator-name <name> | --perspective all) [--as-of <iso>]
   chronicle chatgpt-conversation-view --graphs <dir> [--show-conversation-ids]
-  chronicle observe-init --data-dir <dir> --scope <id> --path <file-or-dir>
-  chronicle observe --data-dir <dir> --scope <id>
-  chronicle watch --data-dir <dir> [--once]
-  chronicle observe-stop --data-dir <dir> [--scope <id>]
-  chronicle observe-resume --data-dir <dir> [--scope <id>]
-  chronicle forget-scope --data-dir <dir> --scope <id>
-  chronicle vault-status --data-dir <dir>
-  chronicle vault-resolve --data-dir <dir> --hash <hex> --output <file>
+  chronicle observe-init [--data-dir <dir>] --scope <id> --path <file-or-dir>
+  chronicle observe [--data-dir <dir>] --scope <id>
+  chronicle watch [--data-dir <dir>] [--once]
+  chronicle observe-stop [--data-dir <dir>] [--scope <id>]
+  chronicle observe-resume [--data-dir <dir>] [--scope <id>]
+  chronicle forget-scope [--data-dir <dir>] --scope <id>
+  chronicle vault-status [--data-dir <dir>]
+  chronicle vault-resolve [--data-dir <dir>] --hash <hex> --output <file>
+  chronicle version
   chronicle queue [show] [--repo <path>]
   chronicle queue add "<title>" [--jira KEY] [--prd NNNN/N] [--due DATE] [--repo <path>]
   chronicle queue done "<title-or-id>" [--repo <path>]
@@ -165,6 +172,7 @@ Commands:
   forget-scope        Delete Chronicle-owned copies for that scope only.
   vault-status        Counts and scope flags for a private data-dir.
   vault-resolve       Copy one vault object out by content hash.
+  version             Print the engine CLI version (package.json).
 
 Options:
   --repo <path>       Absolute path to your personal Chronicle repo.
@@ -215,7 +223,9 @@ Options:
                       --evaluator-name.
   --as-of <iso>       Effective event-time cutoff for
                       current-understanding. Not known-at-T.
-  --data-dir <dir>    Private observe vault + receipts (operator-local).
+  --data-dir <dir>    Private observe vault + receipts. Defaults to
+                      $CHRONICLE_DATA_DIR or
+                      ~/.local/share/rosetta/chronicle/default.
   --scope <id>        Allowlist scope id for observe commands.
   --path <file-or-dir>
                       Source to allowlist (observe-init). Directory walks
@@ -225,7 +235,9 @@ Options:
   --source-graph-hash <hex>
                       Archive content hash the derived record cites.
   --source-ref <hex>  Alias for --source-graph-hash.
-  --version <n>       Transformation recipe version (default 1).
+  --version           As the command (chronicle --version): print the
+                      engine CLI version. As a transform-record flag:
+                      recipe version (--version <n>, default 1).
   --config <json>     Optional JSON object stored on the execution.
   --derived <id>      Derived-record id for transformation-provenance.
   --execution <id>    Execution id for transformation-provenance.
@@ -286,6 +298,7 @@ Environment variables:
   CHRONICLE_INTERPRET_MODEL_FIXTURE
                       Optional local JSON/text file used as the model
                       body. Wins over a live provider.
+  CHRONICLE_DATA_DIR  Default --data-dir for observe and vault commands.
   XAI_API_KEY         Live Responses API key when --provider is xAI.
                       Never persisted.
 `.trim();
@@ -369,6 +382,11 @@ function parseArgs(argv: string[]): ParsedArgs {
 
   if (args.length === 0 || args[0] === '-h' || args[0] === '--help') {
     console.log(USAGE);
+    process.exit(0);
+  }
+
+  if (args[0] === '--version' || args[0] === '-V' || args[0] === 'version') {
+    console.log(readCliVersion(packageRootFromDist()));
     process.exit(0);
   }
 
@@ -1361,8 +1379,7 @@ async function runChatGptConversationView(args: ParsedArgs): Promise<void> {
 }
 
 async function runObserve(args: ParsedArgs): Promise<void> {
-  const dataDir = args.dataDir;
-  if (!dataDir) die('--data-dir <dir> is required');
+  const dataDir = resolveChronicleDataDir(args.dataDir);
   const handler = getObserveHandler();
   const cmd = args.command;
   if (cmd === 'observe-init') {
@@ -1522,6 +1539,9 @@ async function main(): Promise<void> {
       break;
     case 'chatgpt-conversation-view':
       await runChatGptConversationView(args);
+      break;
+    case 'version':
+      console.log(readCliVersion(packageRootFromDist()));
       break;
     case 'observe-init':
     case 'observe':
