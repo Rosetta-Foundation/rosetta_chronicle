@@ -15,7 +15,9 @@ See [`../../rosetta_docs/process/chronicle-build-charter.md`](../../rosetta_docs
 ## V1 raw observe (allowlisted files)
 
 `ObserveHandler` → `ObserveService` → vault / config / receipt
-repositories. Explicit `--data-dir` and `--scope`. Copy-if-new into a
+repositories. `--data-dir` and `--scope`; `--data-dir` defaults to
+`$CHRONICLE_DATA_DIR` or `~/.local/share/rosetta/chronicle/default`.
+Copy-if-new into a
 private content-addressed vault. `observe-init --path` accepts a file or
 an allowlisted directory (recursive; symlink escape is skipped).
 `watch --once` polls those scopes. `forget-scope` deletes Chronicle-owned

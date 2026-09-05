@@ -44,6 +44,17 @@ bun run build   # tsc (TypeScript 7, native)
 bun run test    # jest (@swc/jest transform; type-checking happens in build)
 ```
 
+To put `chronicle` on your `PATH` from this checkout:
+
+```bash
+./scripts/install.sh
+chronicle version
+```
+
+See [`docs/install.md`](docs/install.md). Observe/vault commands default
+to `~/.local/share/rosetta/chronicle/default` when `--data-dir` and
+`$CHRONICLE_DATA_DIR` are unset.
+
 ### Architecture
 
 All TypeScript follows the **Handler / Service / Repository + InversifyJS** pattern that is mandatory
