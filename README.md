@@ -62,8 +62,9 @@ across Rosetta. See the workspace rule at `../.claude/rules/architecture-hsr.md`
 [`CLAUDE.md`](CLAUDE.md). ChatGPT export inventory, source-graph import, derived records,
 transformations, provenance walks, machine interpretation (`interpret-source`),
 append-only human evaluation (`evaluate-derived`),
-the read-only current-understanding view, and the read-only
-ChatGPT conversation-level view
+the read-only current-understanding view, the read-only
+ChatGPT conversation-level view and locate-by-id commands, and
+`chronicle start` (the V1 turn-on alias for `watch`)
 are documented under [`docs/design/`](docs/design/).
 The memory-publication invariant for machine output lives in
 [`docs/design/interpretation-policy.md`](docs/design/interpretation-policy.md).

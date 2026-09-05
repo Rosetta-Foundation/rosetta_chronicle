@@ -5,6 +5,7 @@ import {
   StoreInventory,
 } from '../types';
 import {
+  locateConversation,
   projectConversationView,
   redactConversationView,
 } from '../utils/chatgpt-conversation-view.utils';
@@ -210,5 +211,19 @@ describe('projectConversationView', () => {
     expect(redacted.conversationCount).toBe(1);
     expect(redacted.conversations).toEqual([]);
     expect(JSON.stringify(redacted)).not.toContain('secret-id');
+  });
+
+  it('locates one sourceId and names graph files, not vault objects', () => {
+    const only = graph(HASH_A, T1, [conversation('c1', [node('n1')])]);
+    const view = project([only]);
+    const located = locateConversation(view, 'c1', '/graphs');
+    expect(located.status).toBe('ok');
+    expect(located.conversation?.sourceId).toBe('c1');
+    expect(located.graphFiles).toEqual([
+      { contentHash: HASH_A, path: `/graphs/${HASH_A}.json` },
+    ]);
+    expect(locateConversation(view, 'missing', '/graphs').status).toBe(
+      'not-found',
+    );
   });
 });

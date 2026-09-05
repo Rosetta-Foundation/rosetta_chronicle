@@ -67,11 +67,20 @@ cannot be claimed over silent corruption.
 ## CLI
 
 ```text
-chronicle chatgpt-conversation-view --graphs <dir> [--show-conversation-ids]
+chronicle chatgpt-conversation-view [--graphs <dir>] [--show-conversation-ids]
+chronicle chatgpt-conversation-locate --conversation-id <id> [--graphs <dir>]
 ```
 
-`--graphs` falls back to `$CHRONICLE_SOURCE_GRAPH_DIR`. The command
-writes nothing.
+`--graphs` falls back to `$CHRONICLE_SOURCE_GRAPH_DIR`, then
+`<data-dir>/graphs` (`$CHRONICLE_DATA_DIR` or
+`~/.local/share/rosetta/chronicle/default/graphs`). The commands
+write nothing.
+
+Locate prints one row plus `graphFiles[]` (snapshot JSON paths).
+Those content hashes name graph files, not vault objects.
+`vault-resolve` still needs a receipt / vault object hash.
+
+`chronicle start` is the V1 turn-on alias for `watch`.
 
 ## Not implemented
 

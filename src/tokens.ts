@@ -21,6 +21,9 @@ export const CHRONICLE_TOKENS = {
   ChatGptConversationViewHandler: Symbol.for(
     'ChatGptConversationViewHandler',
   ),
+  ChatGptConversationLocateHandler: Symbol.for(
+    'ChatGptConversationLocateHandler',
+  ),
   ObserveHandler: Symbol.for('ObserveHandler'),
 
   // Services
@@ -35,6 +38,9 @@ export const CHRONICLE_TOKENS = {
   CurrentUnderstandingService: Symbol.for('CurrentUnderstandingService'),
   ChatGptConversationViewService: Symbol.for(
     'ChatGptConversationViewService',
+  ),
+  ChatGptConversationLocateService: Symbol.for(
+    'ChatGptConversationLocateService',
   ),
   ObserveService: Symbol.for('ObserveService'),
 

@@ -501,6 +501,31 @@ export interface ConversationViewInput {
   generatedAt?: string;
 }
 
+/** Path of one source-graph snapshot that contains a conversation. */
+export interface ConversationGraphFile {
+  contentHash: string;
+  path: string;
+}
+
+export interface ConversationLocateInput {
+  graphsDir: string;
+  sourceId: string;
+  generatedAt?: string;
+}
+
+/**
+ * One vendor conversation across snapshots. Rebuildable. Graph file
+ * hashes are not vault object hashes.
+ */
+export interface ConversationLocateView {
+  status: ConversationViewStatus;
+  generatedAt: string;
+  sourceId: string;
+  conversation?: ConversationViewRow;
+  graphFiles: ConversationGraphFile[];
+  failures: StoreInventoryFailure[];
+}
+
 // ─── Derived records (PRD-0027 transformation layer) ─────────────────────────
 
 /**

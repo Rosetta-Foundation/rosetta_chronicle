@@ -39,6 +39,10 @@ import {
   ChatGptConversationViewHandler,
 } from './chatgpt-conversation-view.handler';
 import {
+  IChatGptConversationLocateHandler,
+  ChatGptConversationLocateHandler,
+} from './chatgpt-conversation-locate.handler';
+import {
   IChronicleService,
   ChronicleService,
 } from './services/chronicle.service';
@@ -78,6 +82,10 @@ import {
   IChatGptConversationViewService,
   ChatGptConversationViewService,
 } from './services/chatgpt-conversation-view.service';
+import {
+  IChatGptConversationLocateService,
+  ChatGptConversationLocateService,
+} from './services/chatgpt-conversation-locate.service';
 import { IGitRepository, GitRepository } from './repositories/git.repository';
 import {
   IGitDiscoveryRepository,
@@ -295,6 +303,11 @@ export const buildContainer = (): Container => {
     )
     .to(ChatGptConversationViewService);
   container
+    .bind<IChatGptConversationLocateService>(
+      CHRONICLE_TOKENS.ChatGptConversationLocateService,
+    )
+    .to(ChatGptConversationLocateService);
+  container
     .bind<IObserveService>(CHRONICLE_TOKENS.ObserveService)
     .to(ObserveService);
 
@@ -333,6 +346,11 @@ export const buildContainer = (): Container => {
       CHRONICLE_TOKENS.ChatGptConversationViewHandler,
     )
     .to(ChatGptConversationViewHandler);
+  container
+    .bind<IChatGptConversationLocateHandler>(
+      CHRONICLE_TOKENS.ChatGptConversationLocateHandler,
+    )
+    .to(ChatGptConversationLocateHandler);
   container
     .bind<IObserveHandler>(CHRONICLE_TOKENS.ObserveHandler)
     .to(ObserveHandler);
@@ -409,6 +427,14 @@ export const getChatGptConversationViewHandler =
   (): IChatGptConversationViewHandler => {
     return buildContainer().get<IChatGptConversationViewHandler>(
       CHRONICLE_TOKENS.ChatGptConversationViewHandler,
+    );
+  };
+
+/** Resolve the ChatGPT conversation-locate handler from a fresh container. */
+export const getChatGptConversationLocateHandler =
+  (): IChatGptConversationLocateHandler => {
+    return buildContainer().get<IChatGptConversationLocateHandler>(
+      CHRONICLE_TOKENS.ChatGptConversationLocateHandler,
     );
   };
 

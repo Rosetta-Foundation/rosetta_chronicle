@@ -2,6 +2,7 @@ import { join } from 'path';
 import {
   defaultChronicleDataDir,
   resolveChronicleDataDir,
+  resolveChronicleGraphsDir,
 } from '../utils/chronicle-paths.utils';
 
 const HOME = '/tmp/chronicle-home-fixture';
@@ -29,5 +30,17 @@ describe('chronicle data-dir resolution', () => {
     expect(resolveChronicleDataDir(undefined, {}, HOME)).toBe(
       defaultChronicleDataDir(HOME),
     );
+  });
+
+  it('defaults graphs to <data-dir>/graphs', () => {
+    expect(resolveChronicleGraphsDir(undefined, {}, HOME)).toBe(
+      join(defaultChronicleDataDir(HOME), 'graphs'),
+    );
+  });
+
+  it('prefers CHRONICLE_SOURCE_GRAPH_DIR over the data-dir graphs folder', () => {
+    expect(
+      resolveChronicleGraphsDir(undefined, { CHRONICLE_SOURCE_GRAPH_DIR: '/g' }, HOME),
+    ).toBe('/g');
   });
 });

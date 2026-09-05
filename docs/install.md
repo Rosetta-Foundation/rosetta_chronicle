@@ -30,6 +30,9 @@ Rebuild after pulling CLI changes (`./scripts/install.sh` or
 
 ## Default data-dir
 
+`chronicle start` is the V1 turn-on command (same as `watch`).
+`--once` is a single pass. Data-dir defaults as below.
+
 Observe and vault commands use, in order:
 
 1. `--data-dir <dir>`

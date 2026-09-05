@@ -12,6 +12,7 @@ import {
   getEvaluateHandler,
   getCurrentUnderstandingHandler,
   getChatGptConversationViewHandler,
+  getChatGptConversationLocateHandler,
   getObserveHandler,
   buildContainer,
 } from '../index';
@@ -30,7 +31,10 @@ import { parseProvenanceFrom } from '../utils/provenance-graph.utils';
 import { redactCurrentUnderstandingView } from '../utils/current-understanding.utils';
 import { redactConversationView } from '../utils/chatgpt-conversation-view.utils';
 import { summarizeObserveResults } from '../utils/observe-files.utils';
-import { resolveChronicleDataDir } from '../utils/chronicle-paths.utils';
+import {
+  resolveChronicleDataDir,
+  resolveChronicleGraphsDir,
+} from '../utils/chronicle-paths.utils';
 import {
   packageRootFromDist,
   readCliVersion,
@@ -64,7 +68,8 @@ import { CHRONICLE_TOKENS } from '../tokens';
  *   chronicle chatgpt-conversation-view  Read-only conversation projection.
  *   chronicle observe-init   Allowlist a file or directory beside a private vault.
  *   chronicle observe        Observe allowlisted files (hash, copy-if-new).
- *   chronicle watch          Poll allowlisted scopes once (--once) or until SIGINT.
+ *   chronicle watch / start  Poll allowlisted scopes once (--once) or until SIGINT.
+ *   chronicle chatgpt-conversation-locate  Look up one vendor conversation.
  *   chronicle observe-stop / observe-resume
  *   chronicle forget-scope   V1 scope-only forget of Chronicle-owned copies.
  *   chronicle vault-status / vault-resolve
@@ -93,10 +98,12 @@ Usage:
   chronicle interpret-source --type candidate-observation --export <path> --graph <file> --source-graph-hash <hex> --conversation-id <id> --node-id <id> --output <dir> --executions <dir> --definitions <dir> --occurrences <dir> --provider <name> --model <id> [--dry-run]
   chronicle evaluate-derived --derived <id> --evaluator-name <name> [--evidence-support supported|not-supported|uncertain] [--personal-recognition recognized|rejected|uncertain] --evaluations <dir> --output <dir> [--dry-run]
   chronicle current-understanding --output <dir> --evaluations <dir> (--evaluator-name <name> | --perspective all) [--as-of <iso>]
-  chronicle chatgpt-conversation-view --graphs <dir> [--show-conversation-ids]
+  chronicle chatgpt-conversation-view [--graphs <dir>] [--show-conversation-ids]
+  chronicle chatgpt-conversation-locate --conversation-id <id> [--graphs <dir>]
   chronicle observe-init [--data-dir <dir>] --scope <id> --path <file-or-dir>
   chronicle observe [--data-dir <dir>] --scope <id>
   chronicle watch [--data-dir <dir>] [--once]
+  chronicle start [--data-dir <dir>] [--once]
   chronicle observe-stop [--data-dir <dir>] [--scope <id>]
   chronicle observe-resume [--data-dir <dir>] [--scope <id>]
   chronicle forget-scope [--data-dir <dir>] --scope <id>
@@ -162,11 +169,19 @@ Commands:
                       canonical evidence. Default stdout is aggregates
                       only. --show-conversation-ids includes vendor ids.
                       Does not write or invoke a model.
+                      --graphs defaults to $CHRONICLE_SOURCE_GRAPH_DIR
+                      or <data-dir>/graphs.
+  chatgpt-conversation-locate
+                      Look up one vendor conversation id across
+                      snapshots. Prints graph file paths. Those hashes
+                      are not vault objects; vault-resolve needs a
+                      receipt content hash. Does not write.
   observe-init        Allowlist a file or directory for V1 raw observe.
                       Does not copy bytes yet. Does not emit Activity.
   observe             Hash and copy-if-new every file under one scope.
                       Default stdout is counts, not paths. Not Activity.
   watch               Poll allowlisted scopes. --once is a single pass.
+  start               Same as watch. V1 turn-on command.
   observe-stop / observe-resume
                       Operator STOP for a scope or the whole data-dir.
   forget-scope        Delete Chronicle-owned copies for that scope only.
@@ -209,7 +224,8 @@ Options:
   --occurrences <dir> Directory for execution-occurrence JSON.
                       Falls back to $CHRONICLE_OCCURRENCE_DIR.
   --graphs <dir>      Directory of source-graph JSON files.
-                      Falls back to $CHRONICLE_SOURCE_GRAPH_DIR.
+                      Falls back to $CHRONICLE_SOURCE_GRAPH_DIR, then
+                      <data-dir>/graphs.
   --show-conversation-ids
                       Include vendor conversation ids on
                       chatgpt-conversation-view stdout. Default omits
@@ -231,7 +247,7 @@ Options:
                       Source to allowlist (observe-init). Directory walks
                       that tree only; escaping symlinks are skipped.
   --hash <hex>        Vault object content hash (vault-resolve).
-  --once              Single watch pass; do not poll.
+  --once              Single watch/start pass; do not poll.
   --source-graph-hash <hex>
                       Archive content hash the derived record cites.
   --source-ref <hex>  Alias for --source-graph-hash.
@@ -245,7 +261,9 @@ Options:
   --compare <id>      First execution id to compare.
   --with <id>         Second execution id to compare.
   --conversation-id <id>
-                      Optional conversation id on the source graph.
+                      Vendor conversation id. Required for
+                      chatgpt-conversation-locate. Optional on
+                      interpret-source.
   --node-id <id>      Optional source-graph node id (repeatable).
   --type <kind>       Derived transformation type (human-note, reflection,
                       summary, insight, decision, activity-candidate,
@@ -278,7 +296,9 @@ Environment variables:
   CHRONICLE_CALENDAR  Default value for --calendar (path to .ics export).
   CHRONICLE_SOURCE_GRAPH_DIR
                       Default --output for import-chatgpt and --graphs
-                      for provenance and chatgpt-conversation-view.
+                      for provenance, chatgpt-conversation-view, and
+                      chatgpt-conversation-locate. Falls back to
+                      <data-dir>/graphs.
   CHRONICLE_DERIVED_DIR
                       Default --output for record-derived,
                       transform-record, evaluate-derived,
@@ -1361,18 +1381,29 @@ async function runCurrentUnderstanding(args: ParsedArgs): Promise<void> {
 }
 
 async function runChatGptConversationView(args: ParsedArgs): Promise<void> {
-  const graphsDir = args.graphsDir ?? process.env['CHRONICLE_SOURCE_GRAPH_DIR'];
-  if (!graphsDir) {
-    die(
-      '--graphs <dir> (or $CHRONICLE_SOURCE_GRAPH_DIR) is required for chatgpt-conversation-view',
-    );
-  }
+  const graphsDir = resolveChronicleGraphsDir(args.graphsDir);
   const handler = getChatGptConversationViewHandler();
   const result = await handler.handle({ graphsDir });
   const printed = args.showConversationIds
     ? result
     : redactConversationView(result);
   console.log(JSON.stringify(printed, null, 2));
+  if (result.status === 'invalid' || result.status === 'not-found') {
+    process.exit(1);
+  }
+}
+
+async function runChatGptConversationLocate(args: ParsedArgs): Promise<void> {
+  if (!args.conversationId) {
+    die('--conversation-id <id> is required for chatgpt-conversation-locate');
+  }
+  const graphsDir = resolveChronicleGraphsDir(args.graphsDir);
+  const handler = getChatGptConversationLocateHandler();
+  const result = await handler.handle({
+    graphsDir,
+    sourceId: args.conversationId,
+  });
+  console.log(JSON.stringify(result, null, 2));
   if (result.status === 'invalid' || result.status === 'not-found') {
     process.exit(1);
   }
@@ -1414,7 +1445,7 @@ async function runObserve(args: ParsedArgs): Promise<void> {
     );
     return;
   }
-  if (cmd === 'watch') {
+  if (cmd === 'watch' || cmd === 'start') {
     const tick = async (): Promise<void> => {
       const runs = (await handler.handle({
         op: 'watch-once',
@@ -1540,12 +1571,16 @@ async function main(): Promise<void> {
     case 'chatgpt-conversation-view':
       await runChatGptConversationView(args);
       break;
+    case 'chatgpt-conversation-locate':
+      await runChatGptConversationLocate(args);
+      break;
     case 'version':
       console.log(readCliVersion(packageRootFromDist()));
       break;
     case 'observe-init':
     case 'observe':
     case 'watch':
+    case 'start':
     case 'observe-stop':
     case 'observe-resume':
     case 'forget-scope':
