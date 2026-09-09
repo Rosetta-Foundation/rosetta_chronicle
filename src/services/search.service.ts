@@ -4,6 +4,7 @@ import { CHRONICLE_TOKENS } from '../tokens';
 import {
   LexicalSearchHit,
   LexicalSearchInput,
+  LexicalSearchMatchMode,
   LexicalSearchResult,
   LexicalSearchRole,
 } from '../types';
@@ -13,6 +14,7 @@ import type { ISourceVaultRepository } from '../repositories/source-vault.reposi
 import {
   boundSnippet,
   lexicalIndexOf,
+  normalizeLexicalText,
   uniqueShardReceipts,
   walkShardNodes,
 } from '../utils/lexical-search.utils';
@@ -22,6 +24,8 @@ import {
  *
  * No standing index. Forgotten scopes are not searchable. Stopped
  * scopes remain searchable — STOP withholds new observe, not evidence.
+ * `--match normalized` rewrites query and haystack visibly; it does
+ * not replace `raw`.
  */
 export interface ISearchService {
   search(input: LexicalSearchInput): Promise<LexicalSearchResult>;
@@ -32,14 +36,21 @@ const vaultRootOf = (dataDir: string): string => join(dataDir, 'vault');
 const isSearchRole = (value: string): value is LexicalSearchRole =>
   value === 'user' || value === 'assistant';
 
+const isMatchMode = (value: string): value is LexicalSearchMatchMode =>
+  value === 'raw' || value === 'normalized';
+
 const emptyResult = (
   input: LexicalSearchInput,
   status: LexicalSearchResult['status'],
   elapsedMs: number,
-  error?: string,
+  extras?: { error?: string; normalizedQuery?: string },
 ): LexicalSearchResult => ({
   status,
   query: input.query,
+  matchMode: input.matchMode ?? 'raw',
+  ...(extras?.normalizedQuery !== undefined
+    ? { normalizedQuery: extras.normalizedQuery }
+    : {}),
   branchPolicy: 'all-mapping-nodes',
   hitCount: 0,
   hits: [],
@@ -47,7 +58,7 @@ const emptyResult = (
   nodesScanned: 0,
   scopesSkippedForgotten: 0,
   elapsedMs,
-  ...(error ? { error } : {}),
+  ...(extras?.error ? { error: extras.error } : {}),
 });
 
 /**
@@ -69,29 +80,36 @@ export class SearchService implements ISearchService {
   async search(input: LexicalSearchInput): Promise<LexicalSearchResult> {
     const started = Date.now();
     const query = input.query.trim();
+    const matchMode: LexicalSearchMatchMode = input.matchMode ?? 'raw';
+    const tagged = { ...input, query, matchMode };
     if (query.length === 0) {
-      return emptyResult(
-        { ...input, query },
-        'invalid',
-        Date.now() - started,
-        'empty-query',
-      );
+      return emptyResult(tagged, 'invalid', Date.now() - started, {
+        error: 'empty-query',
+      });
+    }
+    if (!isMatchMode(matchMode)) {
+      return emptyResult(tagged, 'invalid', Date.now() - started, {
+        error: 'unknown-match-mode',
+      });
     }
     if (input.role !== undefined && !isSearchRole(input.role)) {
-      return emptyResult(
-        { ...input, query },
-        'invalid',
-        Date.now() - started,
-        'unknown-role',
-      );
+      return emptyResult(tagged, 'invalid', Date.now() - started, {
+        error: 'unknown-role',
+      });
+    }
+    const normalizedQuery =
+      matchMode === 'normalized' ? normalizeLexicalText(query) : undefined;
+    if (matchMode === 'normalized' && !normalizedQuery) {
+      return emptyResult(tagged, 'invalid', Date.now() - started, {
+        error: 'empty-normalized-query',
+        normalizedQuery: '',
+      });
     }
     const config = await this._config.read(input.dataDir);
     if (!config) {
-      return emptyResult(
-        { ...input, query },
-        'no-config',
-        Date.now() - started,
-      );
+      return emptyResult(tagged, 'no-config', Date.now() - started, {
+        ...(normalizedQuery !== undefined ? { normalizedQuery } : {}),
+      });
     }
 
     let skippedForgotten = 0;
@@ -107,12 +125,10 @@ export class SearchService implements ISearchService {
     if (input.scopeId && !allowed.has(input.scopeId)) {
       const named = config.scopes.find((s) => s.id === input.scopeId);
       if (!named) {
-        return emptyResult(
-          { ...input, query },
-          'not-found',
-          Date.now() - started,
-          'unknown-scope',
-        );
+        return emptyResult(tagged, 'not-found', Date.now() - started, {
+          error: 'unknown-scope',
+          ...(normalizedQuery !== undefined ? { normalizedQuery } : {}),
+        });
       }
     }
 
@@ -138,7 +154,12 @@ export class SearchService implements ISearchService {
       for (const node of nodes) {
         nodesScanned += 1;
         if (hits.length >= limit) break;
-        if (lexicalIndexOf(node.text, query) < 0) continue;
+        const haystack =
+          matchMode === 'normalized'
+            ? normalizeLexicalText(node.text)
+            : node.text;
+        const needle = normalizedQuery ?? query;
+        if (lexicalIndexOf(haystack, needle) < 0) continue;
         if (input.role && node.role !== input.role) continue;
         hits.push({
           scopeId: receipt.scopeId,
@@ -147,7 +168,7 @@ export class SearchService implements ISearchService {
           ...(node.role ? { role: node.role } : {}),
           ...(node.eventTime ? { eventTime: node.eventTime } : {}),
           contentHash: receipt.contentHash,
-          snippet: boundSnippet(node.text, query, snippetChars),
+          snippet: boundSnippet(haystack, needle, snippetChars),
         });
       }
     }
@@ -155,6 +176,8 @@ export class SearchService implements ISearchService {
     return {
       status: 'ok',
       query,
+      matchMode,
+      ...(normalizedQuery !== undefined ? { normalizedQuery } : {}),
       branchPolicy: 'all-mapping-nodes',
       hitCount: hits.length,
       hits,

@@ -164,8 +164,10 @@ Lexical conversation search is a tenth handler:
 It is a read-only scan-per-query over vaulted `conversations-NNN.json`
 bytes. It does not persist an index, invoke a model, or search
 forgotten scopes. Branch policy is every mapping node with text.
-`--role` filters hits; it is not a new matcher. `contentHash` is the
-shard object. See `docs/design/lexical-search.md`.
+`--role` filters hits; it is not a new matcher. `--match normalized`
+is a second inspectable lexical mode (whitespace + `*`/`_`), not a
+silent change to raw. `contentHash` is the shard object. See
+`docs/design/lexical-search.md`.
 
 ### Dependency direction
 

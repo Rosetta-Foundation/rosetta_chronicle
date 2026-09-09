@@ -43,6 +43,14 @@ export const uniqueShardReceipts = (
 const collapseWs = (text: string): string => text.replace(/\s+/g, ' ').trim();
 
 /**
+ * Thin lexical rewrite for `--match normalized`. Collapses whitespace
+ * and strips `*` / `_` emphasis markers. Does not touch punctuation,
+ * stem words, or generate variants. `snake_case` becomes `snakecase`.
+ */
+export const normalizeLexicalText = (text: string): string =>
+  collapseWs(text.replace(/[*_]/g, ''));
+
+/**
  * Case-insensitive substring. Empty query is not a match.
  */
 export const lexicalIndexOf = (haystack: string, query: string): number => {
