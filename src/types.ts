@@ -1353,3 +1353,47 @@ export interface ObserveVaultStatus {
   receiptCount: number;
   scopes: ObserveScope[];
 }
+
+/**
+ * Lexical conversation-body search over vaulted ChatGPT shards.
+ * Scan-per-query. Not an index. Not interpret-source.
+ */
+export type LexicalSearchStatus =
+  | 'ok'
+  | 'invalid'
+  | 'not-found'
+  | 'no-config';
+
+/** How mapping branches are treated. V1 searches every node with text. */
+export type LexicalSearchBranchPolicy = 'all-mapping-nodes';
+
+export interface LexicalSearchInput {
+  dataDir: string;
+  query: string;
+  scopeId?: string;
+  limit: number;
+  snippetChars: number;
+}
+
+export interface LexicalSearchHit {
+  scopeId: string;
+  conversationId: string;
+  nodeId: string;
+  role?: string;
+  eventTime?: string;
+  contentHash: string;
+  snippet: string;
+}
+
+export interface LexicalSearchResult {
+  status: LexicalSearchStatus;
+  query: string;
+  branchPolicy: LexicalSearchBranchPolicy;
+  hitCount: number;
+  hits: LexicalSearchHit[];
+  shardsScanned: number;
+  nodesScanned: number;
+  scopesSkippedForgotten: number;
+  elapsedMs: number;
+  error?: string;
+}

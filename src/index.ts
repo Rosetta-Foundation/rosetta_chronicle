@@ -181,6 +181,8 @@ import {
   IObserveHandler,
   ObserveHandler,
 } from './observe.handler';
+import { ISearchService, SearchService } from './services/search.service';
+import { ISearchHandler, SearchHandler } from './search.handler';
 
 /**
  * Composition root. Wires the InversifyJS container and exposes a factory for
@@ -310,6 +312,9 @@ export const buildContainer = (): Container => {
   container
     .bind<IObserveService>(CHRONICLE_TOKENS.ObserveService)
     .to(ObserveService);
+  container
+    .bind<ISearchService>(CHRONICLE_TOKENS.SearchService)
+    .to(SearchService);
 
   // Handlers
   container
@@ -354,6 +359,9 @@ export const buildContainer = (): Container => {
   container
     .bind<IObserveHandler>(CHRONICLE_TOKENS.ObserveHandler)
     .to(ObserveHandler);
+  container
+    .bind<ISearchHandler>(CHRONICLE_TOKENS.SearchHandler)
+    .to(SearchHandler);
 
   return container;
 };
@@ -441,4 +449,9 @@ export const getChatGptConversationLocateHandler =
 /** Resolve the V1 raw-observe handler from a fresh container. */
 export const getObserveHandler = (): IObserveHandler => {
   return buildContainer().get<IObserveHandler>(CHRONICLE_TOKENS.ObserveHandler);
+};
+
+/** Resolve the lexical conversation-search handler from a fresh container. */
+export const getSearchHandler = (): ISearchHandler => {
+  return buildContainer().get<ISearchHandler>(CHRONICLE_TOKENS.SearchHandler);
 };

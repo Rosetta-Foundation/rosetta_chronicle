@@ -32,6 +32,8 @@ Rebuild after pulling CLI changes (`./scripts/install.sh` or
 
 `chronicle start` is the V1 turn-on command (same as `watch`).
 `--once` is a single pass. Data-dir defaults as below.
+`chronicle search <query>` lexically scans vaulted ChatGPT
+conversation shards in that data-dir (read-only; no index).
 
 Observe and vault commands use, in order:
 
