@@ -1367,10 +1367,14 @@ export type LexicalSearchStatus =
 /** How mapping branches are treated. V1 searches every node with text. */
 export type LexicalSearchBranchPolicy = 'all-mapping-nodes';
 
+/** Vendor author role filter. Other roles are not a V1 CLI surface. */
+export type LexicalSearchRole = 'user' | 'assistant';
+
 export interface LexicalSearchInput {
   dataDir: string;
   query: string;
   scopeId?: string;
+  role?: LexicalSearchRole;
   limit: number;
   snippetChars: number;
 }

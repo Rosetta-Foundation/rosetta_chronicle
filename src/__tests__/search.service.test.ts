@@ -258,6 +258,40 @@ describe('SearchService', () => {
     expect(visible.hitCount).toBe(1);
   });
 
+  it('filters hits by vendor role without changing the matcher', async () => {
+    await observeShard(
+      'live',
+      'conversations-000.json',
+      shard('conv-roles', [
+        { id: 'n-user', role: 'user', text: 'practice of the paths tonight' },
+        {
+          id: 'n-asst',
+          role: 'assistant',
+          text: 'practice of the paths as a reply',
+          parent: 'n-user',
+        },
+      ]),
+    );
+    const users = await search.search({
+      dataDir,
+      query: 'practice of the paths',
+      role: 'user',
+      limit: 20,
+      snippetChars: 80,
+    });
+    expect(users.hitCount).toBe(1);
+    expect(users.hits[0]?.nodeId).toBe('n-user');
+    const assistants = await search.search({
+      dataDir,
+      query: 'practice of the paths',
+      role: 'assistant',
+      limit: 20,
+      snippetChars: 80,
+    });
+    expect(assistants.hitCount).toBe(1);
+    expect(assistants.hits[0]?.nodeId).toBe('n-asst');
+  });
+
   it('returns a typed result shape for latency measurement', async () => {
     await observeShard(
       'live',
