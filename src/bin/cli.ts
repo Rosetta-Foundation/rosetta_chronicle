@@ -14,6 +14,7 @@ import {
   getChatGptConversationViewHandler,
   getChatGptConversationLocateHandler,
   getObserveHandler,
+  getSearchHandler,
   buildContainer,
 } from '../index';
 import {
@@ -31,6 +32,10 @@ import { parseProvenanceFrom } from '../utils/provenance-graph.utils';
 import { redactCurrentUnderstandingView } from '../utils/current-understanding.utils';
 import { redactConversationView } from '../utils/chatgpt-conversation-view.utils';
 import { summarizeObserveResults } from '../utils/observe-files.utils';
+import {
+  DEFAULT_SEARCH_LIMIT,
+  DEFAULT_SNIPPET_CHARS,
+} from '../utils/lexical-search.utils';
 import {
   resolveChronicleDataDir,
   resolveChronicleGraphsDir,
@@ -73,6 +78,7 @@ import { CHRONICLE_TOKENS } from '../tokens';
  *   chronicle observe-stop / observe-resume
  *   chronicle forget-scope   V1 scope-only forget of Chronicle-owned copies.
  *   chronicle vault-status / vault-resolve
+ *   chronicle search   Lexical scan of vaulted ChatGPT conversation shards.
  *   chronicle version   Print the engine CLI version.
  *
  * Daily Chronicle commands (backfill, append-session) are **deprecated /
@@ -109,6 +115,7 @@ Usage:
   chronicle forget-scope [--data-dir <dir>] --scope <id>
   chronicle vault-status [--data-dir <dir>]
   chronicle vault-resolve [--data-dir <dir>] --hash <hex> --output <file>
+  chronicle search <query> [--data-dir <dir>] [--scope <id>] [--limit <n>] [--snippet-chars <n>]
   chronicle version
   chronicle queue [show] [--repo <path>]
   chronicle queue add "<title>" [--jira KEY] [--prd NNNN/N] [--due DATE] [--repo <path>]
@@ -187,6 +194,11 @@ Commands:
   forget-scope        Delete Chronicle-owned copies for that scope only.
   vault-status        Counts and scope flags for a private data-dir.
   vault-resolve       Copy one vault object out by content hash.
+  search              Read-only lexical scan of vaulted ChatGPT
+                      conversation shards. No index, model, or MCP.
+                      Searches every mapping node with text, including
+                      off-current-path siblings. Forgotten scopes are
+                      omitted. Stopped scopes remain searchable.
   version             Print the engine CLI version (package.json).
 
 Options:
@@ -247,6 +259,8 @@ Options:
                       Source to allowlist (observe-init). Directory walks
                       that tree only; escaping symlinks are skipped.
   --hash <hex>        Vault object content hash (vault-resolve).
+  --limit <n>         Max search hits (default 20).
+  --snippet-chars <n> Max characters per search snippet (default 240).
   --once              Single watch/start pass; do not poll.
   --source-graph-hash <hex>
                       Archive content hash the derived record cites.
@@ -387,6 +401,9 @@ interface ParsedArgs {
   contentHash?: string;
   once: boolean;
   showConversationIds: boolean;
+  query?: string;
+  limit?: number;
+  snippetChars?: number;
 }
 
 function parseArgs(argv: string[]): ParsedArgs {
@@ -412,6 +429,16 @@ function parseArgs(argv: string[]): ParsedArgs {
 
   result.command = args[0];
 
+  if (result.command === 'search') {
+    const words: string[] = [];
+    for (let i = 1; i < args.length; i += 1) {
+      const token = args[i];
+      if (!token || token.startsWith('-')) break;
+      words.push(token);
+    }
+    if (words.length > 0) result.query = words.join(' ');
+  }
+
   // For `queue`, the second positional is the subcommand (show|add|done|list).
   // A bare `chronicle queue` defaults to "show".
   if (result.command === 'queue') {
@@ -434,7 +461,12 @@ function parseArgs(argv: string[]): ParsedArgs {
     }
   }
 
-  const startIdx = result.command === 'queue' && result.title ? 3 : 1;
+  const startIdx =
+    result.command === 'queue' && result.title
+      ? 3
+      : result.command === 'search' && result.query
+        ? 1 + result.query.split(' ').length
+        : 1;
   for (let i = startIdx; i < args.length; i++) {
     switch (args[i]) {
       case '--repo':
@@ -611,6 +643,12 @@ function parseArgs(argv: string[]): ParsedArgs {
         break;
       case '--hash':
         result.contentHash = args[++i];
+        break;
+      case '--limit':
+        result.limit = Number(args[++i]);
+        break;
+      case '--snippet-chars':
+        result.snippetChars = Number(args[++i]);
         break;
       case '--once':
         result.once = true;
@@ -1528,6 +1566,28 @@ async function runObserve(args: ParsedArgs): Promise<void> {
   }
 }
 
+async function runSearch(args: ParsedArgs): Promise<void> {
+  if (!args.query) die('search requires a query');
+  const dataDir = resolveChronicleDataDir(args.dataDir);
+  const limit =
+    args.limit !== undefined && Number.isFinite(args.limit)
+      ? args.limit
+      : DEFAULT_SEARCH_LIMIT;
+  const snippetChars =
+    args.snippetChars !== undefined && Number.isFinite(args.snippetChars)
+      ? args.snippetChars
+      : DEFAULT_SNIPPET_CHARS;
+  const result = await getSearchHandler().handle({
+    dataDir,
+    query: args.query,
+    ...(args.scopeId ? { scopeId: args.scopeId } : {}),
+    limit,
+    snippetChars,
+  });
+  console.log(JSON.stringify(result, null, 2));
+  if (result.status !== 'ok') process.exit(1);
+}
+
 async function main(): Promise<void> {
   const args = parseArgs(process.argv);
 
@@ -1587,6 +1647,9 @@ async function main(): Promise<void> {
     case 'vault-status':
     case 'vault-resolve':
       await runObserve(args);
+      break;
+    case 'search':
+      await runSearch(args);
       break;
     default:
       console.error(`chronicle: unknown command '${args.command}'\n`);

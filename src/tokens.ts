@@ -25,6 +25,7 @@ export const CHRONICLE_TOKENS = {
     'ChatGptConversationLocateHandler',
   ),
   ObserveHandler: Symbol.for('ObserveHandler'),
+  SearchHandler: Symbol.for('SearchHandler'),
 
   // Services
   ChronicleService: Symbol.for('ChronicleService'),
@@ -43,6 +44,7 @@ export const CHRONICLE_TOKENS = {
     'ChatGptConversationLocateService',
   ),
   ObserveService: Symbol.for('ObserveService'),
+  SearchService: Symbol.for('SearchService'),
 
   // Repositories (one per source)
   GitRepository: Symbol.for('GitRepository'),

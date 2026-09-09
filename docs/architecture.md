@@ -159,6 +159,13 @@ names the graph snapshot files (not vault objects). `chronicle start`
 is the V1 turn-on alias for `watch`. See
 `docs/design/chatgpt-conversation-view.md`.
 
+Lexical conversation search is a tenth handler:
+`SearchHandler` → `SearchService` → observe config + receipts + vault.
+It is a read-only scan-per-query over vaulted `conversations-NNN.json`
+bytes. It does not persist an index, invoke a model, or search
+forgotten scopes. Branch policy is every mapping node with text.
+See `docs/design/lexical-search.md`.
+
 ### Dependency direction
 
 ```

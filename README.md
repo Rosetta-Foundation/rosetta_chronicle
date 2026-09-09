@@ -63,8 +63,10 @@ across Rosetta. See the workspace rule at `../.claude/rules/architecture-hsr.md`
 transformations, provenance walks, machine interpretation (`interpret-source`),
 append-only human evaluation (`evaluate-derived`),
 the read-only current-understanding view, the read-only
-ChatGPT conversation-level view and locate-by-id commands, and
-`chronicle start` (the V1 turn-on alias for `watch`)
+ChatGPT conversation-level view and locate-by-id commands,
+`chronicle start` (the V1 turn-on alias for `watch`), and
+`chronicle search` (read-only lexical scan of vaulted ChatGPT
+shards; no index)
 are documented under [`docs/design/`](docs/design/).
 The memory-publication invariant for machine output lives in
 [`docs/design/interpretation-policy.md`](docs/design/interpretation-policy.md).

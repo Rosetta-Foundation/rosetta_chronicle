@@ -51,6 +51,7 @@ describe('chronicle CLI', () => {
     expect(result.stdout).toContain('current-understanding');
     expect(result.stdout).toContain('chatgpt-conversation-view');
     expect(result.stdout).toContain('chatgpt-conversation-locate');
+    expect(result.stdout).toContain('chronicle search');
     expect(result.stdout).toContain('chronicle start');
     expect(result.stdout).toContain('observe-init');
     expect(result.stdout).toContain('forget-scope');
@@ -474,6 +475,14 @@ describe('chronicle CLI', () => {
     } finally {
       rmSync(home, { recursive: true, force: true });
     }
+  });
+
+  it('search exits 1 without a query', () => {
+    const result = spawnSync(process.execPath, [CLI, 'search'], {
+      encoding: 'utf-8',
+    });
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('search requires a query');
   });
 
   it('chatgpt-conversation-locate exits 1 without --conversation-id', () => {
