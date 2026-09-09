@@ -1370,11 +1370,18 @@ export type LexicalSearchBranchPolicy = 'all-mapping-nodes';
 /** Vendor author role filter. Other roles are not a V1 CLI surface. */
 export type LexicalSearchRole = 'user' | 'assistant';
 
+/**
+ * `raw` is the locked baseline (literal substring). `normalized` is a
+ * second inspectable mode, not a silent redefinition of `raw`.
+ */
+export type LexicalSearchMatchMode = 'raw' | 'normalized';
+
 export interface LexicalSearchInput {
   dataDir: string;
   query: string;
   scopeId?: string;
   role?: LexicalSearchRole;
+  matchMode?: LexicalSearchMatchMode;
   limit: number;
   snippetChars: number;
 }
@@ -1392,6 +1399,8 @@ export interface LexicalSearchHit {
 export interface LexicalSearchResult {
   status: LexicalSearchStatus;
   query: string;
+  matchMode: LexicalSearchMatchMode;
+  normalizedQuery?: string;
   branchPolicy: LexicalSearchBranchPolicy;
   hitCount: number;
   hits: LexicalSearchHit[];

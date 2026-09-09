@@ -45,7 +45,12 @@ matches, or what the operator believed.
   object.
 - Matching is a case-insensitive **substring**, not a token or word
   boundary. `path` hits `empathy` and `paths`. Markdown markers such
-  as `**` are part of the stored text and break an unformatted phrase.
+  as `**` are part of the stored text and break an unformatted phrase
+  in `--match raw`.
+- `--match raw` (default) is the locked baseline. `--match normalized`
+  is a second mode: collapse whitespace and strip `*` / `_`. It does
+  not stem, expand, or mush punctuation. The rewrite is returned as
+  `normalizedQuery`. `snake_case` becomes `snakecase`.
 - `--role user|assistant` filters hits after the match. It does not
   change the matcher. Nodes without that role are omitted.
 - Snippets are bounded (`--snippet-chars`, default 240).
@@ -65,13 +70,15 @@ matches, or what the operator believed.
 ## Out of scope (must be earned)
 
 FTS, query expansion, embeddings, MCP, provider egress, a durable
-index, and searching non-ChatGPT vault objects.
+index, word-boundary ranking, and searching non-ChatGPT vault objects.
+`--match normalized` is not those things.
 
 ## CLI
 
 ```text
 chronicle search <query> [--data-dir <dir>] [--scope <id>]
                          [--role user|assistant]
+                         [--match raw|normalized]
                          [--limit <n>] [--snippet-chars <n>]
 ```
 

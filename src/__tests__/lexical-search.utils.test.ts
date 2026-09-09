@@ -2,6 +2,7 @@ import {
   boundSnippet,
   isConversationShardPath,
   lexicalIndexOf,
+  normalizeLexicalText,
   uniqueShardReceipts,
   walkShardNodes,
 } from '../utils/lexical-search.utils';
@@ -55,6 +56,19 @@ describe('uniqueShardReceipts', () => {
     const unique = uniqueShardReceipts(receipts, new Set(['keep']));
     expect(unique).toHaveLength(1);
     expect(unique[0]?.observationId).toBe('obs-2');
+  });
+});
+
+describe('normalizeLexicalText', () => {
+  it('collapses whitespace and strips star/underscore markers', () => {
+    expect(normalizeLexicalText('practice of  the paths')).toBe(
+      'practice of the paths',
+    );
+    expect(normalizeLexicalText('path **is** the data')).toBe(
+      'path is the data',
+    );
+    expect(normalizeLexicalText('snake_case')).toBe('snakecase');
+    expect(normalizeLexicalText('paths,')).toBe('paths,');
   });
 });
 

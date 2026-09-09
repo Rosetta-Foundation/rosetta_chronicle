@@ -115,7 +115,7 @@ Usage:
   chronicle forget-scope [--data-dir <dir>] --scope <id>
   chronicle vault-status [--data-dir <dir>]
   chronicle vault-resolve [--data-dir <dir>] --hash <hex> --output <file>
-  chronicle search <query> [--data-dir <dir>] [--scope <id>] [--role user|assistant] [--limit <n>] [--snippet-chars <n>]
+  chronicle search <query> [--data-dir <dir>] [--scope <id>] [--role user|assistant] [--match raw|normalized] [--limit <n>] [--snippet-chars <n>]
   chronicle version
   chronicle queue [show] [--repo <path>]
   chronicle queue add "<title>" [--jira KEY] [--prd NNNN/N] [--due DATE] [--repo <path>]
@@ -200,6 +200,8 @@ Commands:
                       off-current-path siblings. Forgotten scopes are
                       omitted. Stopped scopes remain searchable.
                       --role filters hits (user or assistant).
+                      --match raw is the default; normalized is a
+                      second inspectable rewrite.
   version             Print the engine CLI version (package.json).
 
 Options:
@@ -264,6 +266,10 @@ Options:
   --snippet-chars <n> Max characters per search snippet (default 240).
   --role <role>       Search hit filter: user or assistant. Not a
                       matcher change. Other vendor roles are omitted.
+  --match <mode>      Search matcher: raw (default, literal substring)
+                      or normalized (collapse whitespace; strip * _).
+                      Punctuation is unchanged. Normalized returns
+                      normalizedQuery so the rewrite is visible.
   --once              Single watch/start pass; do not poll.
   --source-graph-hash <hex>
                       Archive content hash the derived record cites.
@@ -406,6 +412,7 @@ interface ParsedArgs {
   showConversationIds: boolean;
   query?: string;
   role?: string;
+  matchMode?: string;
   limit?: number;
   snippetChars?: number;
 }
@@ -658,6 +665,9 @@ function parseArgs(argv: string[]): ParsedArgs {
         break;
       case '--role':
         result.role = args[++i];
+        break;
+      case '--match':
+        result.matchMode = args[++i];
         break;
       case '--once':
         result.once = true;
@@ -1590,11 +1600,16 @@ async function runSearch(args: ParsedArgs): Promise<void> {
   if (role && role !== 'user' && role !== 'assistant') {
     die('search --role must be user or assistant');
   }
+  const matchMode = (args.matchMode ?? 'raw').trim().toLowerCase();
+  if (matchMode !== 'raw' && matchMode !== 'normalized') {
+    die('search --match must be raw or normalized');
+  }
   const result = await getSearchHandler().handle({
     dataDir,
     query: args.query,
     ...(args.scopeId ? { scopeId: args.scopeId } : {}),
     ...(role === 'user' || role === 'assistant' ? { role } : {}),
+    matchMode,
     limit,
     snippetChars,
   });

@@ -101,6 +101,8 @@ describe('SearchService', () => {
     expect(result.hits[0]?.scopeId).toBe('live');
     expect(result.hits[0]?.contentHash).toMatch(/^[a-f0-9]{64}$/);
     expect(result.hits[0]?.snippet.toLowerCase()).toContain('path is the data');
+    expect(result.matchMode).toBe('raw');
+    expect(result.normalizedQuery).toBeUndefined();
     expect(typeof result.elapsedMs).toBe('number');
   });
 
@@ -256,6 +258,56 @@ describe('SearchService', () => {
       snippetChars: 80,
     });
     expect(visible.hitCount).toBe(1);
+  });
+
+  it('keeps raw misses that normalized can hit', async () => {
+    await observeShard(
+      'live',
+      'conversations-000.json',
+      shard('conv-norm', [
+        {
+          id: 'n-md',
+          role: 'user',
+          text: 'the **path** is the data tonight',
+        },
+      ]),
+    );
+    const rawSpace = await search.search({
+      dataDir,
+      query: 'path is the data',
+      matchMode: 'raw',
+      limit: 20,
+      snippetChars: 80,
+    });
+    expect(rawSpace.hitCount).toBe(0);
+    expect(rawSpace.matchMode).toBe('raw');
+    const normalized = await search.search({
+      dataDir,
+      query: 'path is  the data',
+      matchMode: 'normalized',
+      limit: 20,
+      snippetChars: 80,
+    });
+    expect(normalized.hitCount).toBe(1);
+    expect(normalized.matchMode).toBe('normalized');
+    expect(normalized.normalizedQuery).toBe('path is the data');
+    expect(normalized.hits[0]?.nodeId).toBe('n-md');
+    const punct = await search.search({
+      dataDir,
+      query: 'path is the data,',
+      matchMode: 'normalized',
+      limit: 20,
+      snippetChars: 80,
+    });
+    expect(punct.hitCount).toBe(0);
+    const paraphrase = await search.search({
+      dataDir,
+      query: 'Personal Chronicle as trajectory',
+      matchMode: 'normalized',
+      limit: 20,
+      snippetChars: 80,
+    });
+    expect(paraphrase.hitCount).toBe(0);
   });
 
   it('filters hits by vendor role without changing the matcher', async () => {

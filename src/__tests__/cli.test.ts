@@ -53,6 +53,7 @@ describe('chronicle CLI', () => {
     expect(result.stdout).toContain('chatgpt-conversation-locate');
     expect(result.stdout).toContain('chronicle search');
     expect(result.stdout).toContain('--role');
+    expect(result.stdout).toContain('--match');
     expect(result.stdout).toContain('chronicle start');
     expect(result.stdout).toContain('observe-init');
     expect(result.stdout).toContain('forget-scope');
@@ -581,6 +582,13 @@ describe('chronicle CLI', () => {
       );
       expect(badRole.status).toBe(1);
       expect(badRole.stderr).toContain('--role');
+      const badMatch = spawnSync(
+        process.execPath,
+        [CLI, 'search', 'practice of the paths', '--match', 'fuzzy'],
+        { encoding: 'utf-8' },
+      );
+      expect(badMatch.status).toBe(1);
+      expect(badMatch.stderr).toContain('--match');
     } finally {
       rmSync(dataDir, { recursive: true, force: true });
     }
