@@ -5,6 +5,7 @@ import {
   LexicalSearchHit,
   LexicalSearchInput,
   LexicalSearchResult,
+  LexicalSearchRole,
 } from '../types';
 import type { IObserveConfigRepository } from '../repositories/observe-config.repository';
 import type { IObservationReceiptRepository } from '../repositories/observation-receipt.repository';
@@ -27,6 +28,9 @@ export interface ISearchService {
 }
 
 const vaultRootOf = (dataDir: string): string => join(dataDir, 'vault');
+
+const isSearchRole = (value: string): value is LexicalSearchRole =>
+  value === 'user' || value === 'assistant';
 
 const emptyResult = (
   input: LexicalSearchInput,
@@ -71,6 +75,14 @@ export class SearchService implements ISearchService {
         'invalid',
         Date.now() - started,
         'empty-query',
+      );
+    }
+    if (input.role !== undefined && !isSearchRole(input.role)) {
+      return emptyResult(
+        { ...input, query },
+        'invalid',
+        Date.now() - started,
+        'unknown-role',
       );
     }
     const config = await this._config.read(input.dataDir);
@@ -127,6 +139,7 @@ export class SearchService implements ISearchService {
         nodesScanned += 1;
         if (hits.length >= limit) break;
         if (lexicalIndexOf(node.text, query) < 0) continue;
+        if (input.role && node.role !== input.role) continue;
         hits.push({
           scopeId: receipt.scopeId,
           conversationId: node.conversationId,

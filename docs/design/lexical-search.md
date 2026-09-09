@@ -38,8 +38,16 @@ matches, or what the operator believed.
 - Forgotten scopes are omitted. Stopped scopes remain searchable.
 - `eventTime` is vendor `create_time` when present. Never filesystem
   mtime.
-- `contentHash` is the vault object hash (receipt), not a graph-file
-  hash.
+- `contentHash` is the vault object hash for the **shard file**
+  (`conversations-NNN.json`), not a conversation, node, or graph-file
+  hash. The same `conversationId` under two `--scope` values with
+  different hashes is two snapshots of one conversation, not one
+  object.
+- Matching is a case-insensitive **substring**, not a token or word
+  boundary. `path` hits `empathy` and `paths`. Markdown markers such
+  as `**` are part of the stored text and break an unformatted phrase.
+- `--role user|assistant` filters hits after the match. It does not
+  change the matcher. Nodes without that role are omitted.
 - Snippets are bounded (`--snippet-chars`, default 240).
 - Hit cap is `--limit` (default 20).
 - `elapsedMs` is measured per run. Do not promote one host's latency
@@ -63,5 +71,10 @@ index, and searching non-ChatGPT vault objects.
 
 ```text
 chronicle search <query> [--data-dir <dir>] [--scope <id>]
+                         [--role user|assistant]
                          [--limit <n>] [--snippet-chars <n>]
 ```
+
+`<query>` may be one quoted string or several words. Flags after the
+query are parsed either way — do not count spaces inside a quoted
+query as extra argv tokens.

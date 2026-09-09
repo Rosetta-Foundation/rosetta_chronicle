@@ -52,6 +52,7 @@ describe('chronicle CLI', () => {
     expect(result.stdout).toContain('chatgpt-conversation-view');
     expect(result.stdout).toContain('chatgpt-conversation-locate');
     expect(result.stdout).toContain('chronicle search');
+    expect(result.stdout).toContain('--role');
     expect(result.stdout).toContain('chronicle start');
     expect(result.stdout).toContain('observe-init');
     expect(result.stdout).toContain('forget-scope');
@@ -483,6 +484,106 @@ describe('chronicle CLI', () => {
     });
     expect(result.status).toBe(1);
     expect(result.stderr).toContain('search requires a query');
+  });
+
+  it('search parses flags after a quoted multi-word query', () => {
+    const dataDir = mkdtempSync(join(tmpdir(), 'cli-search-quoted-'));
+    const source = join(dataDir, 'src');
+    mkdirSync(source);
+    writeFileSync(
+      join(source, 'conversations-000.json'),
+      `${JSON.stringify([
+        {
+          conversation_id: 'conv-cli',
+          current_node: 'n1',
+          mapping: {
+            n1: {
+              id: 'n1',
+              parent: null,
+              message: {
+                author: { role: 'user' },
+                create_time: 1700000000,
+                content: {
+                  content_type: 'text',
+                  parts: ['practice of the paths'],
+                },
+              },
+            },
+          },
+        },
+      ])}\n`,
+    );
+    try {
+      const init = spawnSync(
+        process.execPath,
+        [
+          CLI,
+          'observe-init',
+          '--data-dir',
+          dataDir,
+          '--scope',
+          'live',
+          '--path',
+          source,
+        ],
+        { encoding: 'utf-8' },
+      );
+      expect(init.status).toBe(0);
+      const observed = spawnSync(
+        process.execPath,
+        [CLI, 'observe', '--data-dir', dataDir, '--scope', 'live'],
+        { encoding: 'utf-8' },
+      );
+      expect(observed.status).toBe(0);
+      const missing = spawnSync(
+        process.execPath,
+        [
+          CLI,
+          'search',
+          'practice of the paths',
+          '--data-dir',
+          dataDir,
+          '--scope',
+          'missing',
+        ],
+        { encoding: 'utf-8' },
+      );
+      expect(missing.status).toBe(1);
+      const missingBody = JSON.parse(missing.stdout) as {
+        status: string;
+        error?: string;
+      };
+      expect(missingBody.status).toBe('not-found');
+      const users = spawnSync(
+        process.execPath,
+        [
+          CLI,
+          'search',
+          'practice of the paths',
+          '--data-dir',
+          dataDir,
+          '--role',
+          'user',
+        ],
+        { encoding: 'utf-8' },
+      );
+      expect(users.status).toBe(0);
+      const usersBody = JSON.parse(users.stdout) as {
+        hitCount: number;
+        hits: { role?: string }[];
+      };
+      expect(usersBody.hitCount).toBe(1);
+      expect(usersBody.hits[0]?.role).toBe('user');
+      const badRole = spawnSync(
+        process.execPath,
+        [CLI, 'search', 'practice of the paths', '--role', 'system'],
+        { encoding: 'utf-8' },
+      );
+      expect(badRole.status).toBe(1);
+      expect(badRole.stderr).toContain('--role');
+    } finally {
+      rmSync(dataDir, { recursive: true, force: true });
+    }
   });
 
   it('chatgpt-conversation-locate exits 1 without --conversation-id', () => {

@@ -115,7 +115,7 @@ Usage:
   chronicle forget-scope [--data-dir <dir>] --scope <id>
   chronicle vault-status [--data-dir <dir>]
   chronicle vault-resolve [--data-dir <dir>] --hash <hex> --output <file>
-  chronicle search <query> [--data-dir <dir>] [--scope <id>] [--limit <n>] [--snippet-chars <n>]
+  chronicle search <query> [--data-dir <dir>] [--scope <id>] [--role user|assistant] [--limit <n>] [--snippet-chars <n>]
   chronicle version
   chronicle queue [show] [--repo <path>]
   chronicle queue add "<title>" [--jira KEY] [--prd NNNN/N] [--due DATE] [--repo <path>]
@@ -199,6 +199,7 @@ Commands:
                       Searches every mapping node with text, including
                       off-current-path siblings. Forgotten scopes are
                       omitted. Stopped scopes remain searchable.
+                      --role filters hits (user or assistant).
   version             Print the engine CLI version (package.json).
 
 Options:
@@ -261,6 +262,8 @@ Options:
   --hash <hex>        Vault object content hash (vault-resolve).
   --limit <n>         Max search hits (default 20).
   --snippet-chars <n> Max characters per search snippet (default 240).
+  --role <role>       Search hit filter: user or assistant. Not a
+                      matcher change. Other vendor roles are omitted.
   --once              Single watch/start pass; do not poll.
   --source-graph-hash <hex>
                       Archive content hash the derived record cites.
@@ -402,6 +405,7 @@ interface ParsedArgs {
   once: boolean;
   showConversationIds: boolean;
   query?: string;
+  role?: string;
   limit?: number;
   snippetChars?: number;
 }
@@ -429,6 +433,7 @@ function parseArgs(argv: string[]): ParsedArgs {
 
   result.command = args[0];
 
+  let searchArgvCount = 0;
   if (result.command === 'search') {
     const words: string[] = [];
     for (let i = 1; i < args.length; i += 1) {
@@ -436,6 +441,7 @@ function parseArgs(argv: string[]): ParsedArgs {
       if (!token || token.startsWith('-')) break;
       words.push(token);
     }
+    searchArgvCount = words.length;
     if (words.length > 0) result.query = words.join(' ');
   }
 
@@ -465,7 +471,7 @@ function parseArgs(argv: string[]): ParsedArgs {
     result.command === 'queue' && result.title
       ? 3
       : result.command === 'search' && result.query
-        ? 1 + result.query.split(' ').length
+        ? 1 + searchArgvCount
         : 1;
   for (let i = startIdx; i < args.length; i++) {
     switch (args[i]) {
@@ -649,6 +655,9 @@ function parseArgs(argv: string[]): ParsedArgs {
         break;
       case '--snippet-chars':
         result.snippetChars = Number(args[++i]);
+        break;
+      case '--role':
+        result.role = args[++i];
         break;
       case '--once':
         result.once = true;
@@ -1577,10 +1586,15 @@ async function runSearch(args: ParsedArgs): Promise<void> {
     args.snippetChars !== undefined && Number.isFinite(args.snippetChars)
       ? args.snippetChars
       : DEFAULT_SNIPPET_CHARS;
+  const role = args.role?.trim().toLowerCase();
+  if (role && role !== 'user' && role !== 'assistant') {
+    die('search --role must be user or assistant');
+  }
   const result = await getSearchHandler().handle({
     dataDir,
     query: args.query,
     ...(args.scopeId ? { scopeId: args.scopeId } : {}),
+    ...(role === 'user' || role === 'assistant' ? { role } : {}),
     limit,
     snippetChars,
   });
