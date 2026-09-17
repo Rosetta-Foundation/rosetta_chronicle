@@ -149,6 +149,11 @@ Implemented:
   record reduced `recognized` → `rejected`; separate adversarial
   equal-time probe on another record → `conflict`; no new schema;
   sanitized result in `docs/design/revision-experiment.md`)
+- transformation lineage via immutable executions + provenance walks
+  (implemented; not a stored person/concept graph)
+- bounded source-only context packet (`chronicle context-packet`;
+  lexical evidence handoff; no identity resolution; no live default
+  data-dir; `docs/design/context-packet.md`)
 
 Not implemented:
 
@@ -161,6 +166,9 @@ Not implemented:
 - a second live provider, Cursor agent transport, a vendored SDK,
   or a local inference adapter (backlog:
   `docs/design/local-model-adapter.md`; not E6)
+- identity resolution, concept origin, or derived attachment on
+  context packets (source-only slice; graph-to-vault membership
+  unresolved)
 - bulk conversation scan
 - biography, profile, or materialized current-understanding artifact
 - a new E7 schema or handler (E7 was a private experiment on

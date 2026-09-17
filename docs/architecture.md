@@ -64,8 +64,8 @@ Chronicle follows the mandatory Rosetta pattern (full ruleset:
 | **Service** | The synthesis/orchestration logic — gather from source repositories, correlate evidence, infer tags, compose the output document. | `ChronicleService` |
 | **Repository** | Source adapters — one per activity source. Resource access only. | `GitRepository`, `JiraRepository`, `ClaudeCodeRepository`, `NotesRepository` |
 
-Adding a new activity source (GitHub, Slack, Confluence, Calendar) means adding a new repository that
-implements a source-adapter contract, then wiring it into the service — no changes to the handler.
+Do not add `ActivitySource` members. New capture is allowlisted vault
+observe, not a new Daily Chronicle adapter.
 
 ChatGPT export inventory (PRD-0027 Phase 1) follows the same layers — `ChatGptInventoryHandler` →
 `ChatGptInventoryService` → `ChatGptExportRepository` — but is **not** wired into Daily Chronicle
@@ -169,6 +169,15 @@ is a second inspectable lexical mode (whitespace + `*`/`_`), not a
 silent change to raw. `contentHash` is the shard object. See
 `docs/design/lexical-search.md`.
 
+Context packet is an eleventh handler:
+`ContextPacketHandler` → `ContextPacketService` → the same config,
+receipt, and vault repositories (diagnostic/verified methods). It
+assembles one bounded JSON evidence packet from explicit selectors.
+It does not call `SearchService`, persist a packet, resolve identity,
+or inherit the live default data-dir. Derived/evaluation attachment
+is deferred until a verified vault-to-graph membership exists. See
+`docs/design/context-packet.md`.
+
 ### Dependency direction
 
 ```
@@ -189,7 +198,8 @@ The service composes repositories; repositories never call the service or each o
 
 Defined in `src/types.ts`:
 
-- **Activity** — a single observed engineering event from a source (a commit, a Jira transition, a conversation turn, a note).
+- **Activity** — frozen v0.1 Daily Chronicle event. Not the capture
+  contract for new work. Do not add sources.
 - **Evidence** — a reference back to the source artifact that justifies a statement (never fabricated).
 - **Tag** — an inferred category from the Rosetta tag taxonomy (see `mvp.md`).
 - **DailyChronicle** — the synthesized output document (the v0.1 deliverable).

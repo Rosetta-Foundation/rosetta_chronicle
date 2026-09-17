@@ -15,6 +15,7 @@ import {
   getChatGptConversationLocateHandler,
   getObserveHandler,
   getSearchHandler,
+  getContextPacketHandler,
   buildContainer,
 } from '../index';
 import {
@@ -36,6 +37,7 @@ import {
   DEFAULT_SEARCH_LIMIT,
   DEFAULT_SNIPPET_CHARS,
 } from '../utils/lexical-search.utils';
+import { parseContextPacketRequestFile } from '../utils/context-packet-request.utils';
 import {
   resolveChronicleDataDir,
   resolveChronicleGraphsDir,
@@ -79,6 +81,7 @@ import { CHRONICLE_TOKENS } from '../tokens';
  *   chronicle forget-scope   V1 scope-only forget of Chronicle-owned copies.
  *   chronicle vault-status / vault-resolve
  *   chronicle search   Lexical scan of vaulted ChatGPT conversation shards.
+ *   chronicle context-packet   Bounded read-only evidence packet.
  *   chronicle version   Print the engine CLI version.
  *
  * Daily Chronicle commands (backfill, append-session) are **deprecated /
@@ -116,6 +119,7 @@ Usage:
   chronicle vault-status [--data-dir <dir>]
   chronicle vault-resolve [--data-dir <dir>] --hash <hex> --output <file>
   chronicle search <query> [--data-dir <dir>] [--scope <id>] [--role user|assistant] [--match raw|normalized] [--limit <n>] [--snippet-chars <n>]
+  chronicle context-packet --request <file>
   chronicle version
   chronicle queue [show] [--repo <path>]
   chronicle queue add "<title>" [--jira KEY] [--prd NNNN/N] [--due DATE] [--repo <path>]
@@ -202,6 +206,11 @@ Commands:
                       --role filters hits (user or assistant).
                       --match raw is the default; normalized is a
                       second inspectable rewrite.
+  context-packet      Read-only bounded evidence packet over vaulted
+                      ChatGPT shards. Requires --request JSON with
+                      explicit dataDir and scopes. Does not inherit
+                      the live default data-dir. No index, model, or
+                      identity resolution. Exit 0=ok, 2=partial, 1=else.
   version             Print the engine CLI version (package.json).
 
 Options:
@@ -270,6 +279,8 @@ Options:
                       or normalized (collapse whitespace; strip * _).
                       Punctuation is unchanged. Normalized returns
                       normalizedQuery so the rewrite is visible.
+  --request <file>    JSON request for context-packet. Authorizes
+                      reading that file only. Not persisted.
   --once              Single watch/start pass; do not poll.
   --source-graph-hash <hex>
                       Archive content hash the derived record cites.
@@ -415,6 +426,7 @@ interface ParsedArgs {
   matchMode?: string;
   limit?: number;
   snippetChars?: number;
+  requestFile?: string;
 }
 
 function parseArgs(argv: string[]): ParsedArgs {
@@ -653,6 +665,9 @@ function parseArgs(argv: string[]): ParsedArgs {
         break;
       case '--path':
         result.sourceFile = args[++i];
+        break;
+      case '--request':
+        result.requestFile = args[++i];
         break;
       case '--hash':
         result.contentHash = args[++i];
@@ -1617,6 +1632,34 @@ async function runSearch(args: ParsedArgs): Promise<void> {
   if (result.status !== 'ok') process.exit(1);
 }
 
+async function runContextPacket(args: ParsedArgs): Promise<void> {
+  if (!args.requestFile) {
+    die('context-packet requires --request <file>');
+  }
+  let raw: unknown;
+  try {
+    raw = JSON.parse(readFileSync(args.requestFile, 'utf8'));
+  } catch {
+    die('context-packet --request must be readable JSON');
+  }
+  const parsed = parseContextPacketRequestFile(raw);
+  if (!parsed.ok) {
+    die(`context-packet invalid request: ${parsed.error}`);
+  }
+  const result = await getContextPacketHandler().handle(parsed.input);
+  const rendered = JSON.stringify(result, null, 2);
+  console.log(rendered);
+  if (result.status === 'ok') {
+    process.exitCode = 0;
+    return;
+  }
+  if (result.status === 'partial') {
+    process.exitCode = 2;
+    return;
+  }
+  process.exitCode = 1;
+}
+
 async function main(): Promise<void> {
   const args = parseArgs(process.argv);
 
@@ -1679,6 +1722,9 @@ async function main(): Promise<void> {
       break;
     case 'search':
       await runSearch(args);
+      break;
+    case 'context-packet':
+      await runContextPacket(args);
       break;
     default:
       console.error(`chronicle: unknown command '${args.command}'\n`);

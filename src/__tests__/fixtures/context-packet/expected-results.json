@@ -1,0 +1,63 @@
+{
+  "schema": "context-packet-oracle/1",
+  "notes": "Logical IDs only. Runtime occurrence refs are mapped in tests.",
+  "cases": {
+    "P1": {
+      "selectors": ["winding path", "practicing the winding path"],
+      "requiredRoles": ["user", "assistant", "user"],
+      "requiredMonths": ["2024-01", "2024-02", "2024-03"],
+      "forbidden": ["newly coined", "global origin", "same person"]
+    },
+    "P2": {
+      "sameEvidenceAs": "P1",
+      "currentThreadOnly": false
+    },
+    "P3": {
+      "forgottenScope": "practice-a",
+      "originEstablished": false,
+      "forgottenFingerprintsAbsent": true
+    },
+    "P4": {
+      "userRoleIsNotEndorsement": true
+    },
+    "D1": {
+      "identityResolution": "not-performed",
+      "separateOccurrences": 3
+    },
+    "D2": {
+      "assistantEqualityIsNotResolution": true
+    },
+    "D3": {
+      "sameNameNotMerged": true
+    },
+    "D4": {
+      "contradictoryTestimonyPreserved": true
+    },
+    "T1": {
+      "julyStaysJuly": true,
+      "septemberExcludedByAugustCutoff": true
+    },
+    "S1": {
+      "bothSnapshotsSurvive": true
+    },
+    "C1": {
+      "neighborIsMechanical": true
+    },
+    "R1": {
+      "paraphraseMisses": true,
+      "normalizedHitsDoubleSpace": true
+    },
+    "F1": {
+      "hashMismatchIsPartial": true
+    },
+    "F2": {
+      "forgottenSharedHashDoesNotLeak": true
+    },
+    "F3": {
+      "selectionDeterministic": true
+    },
+    "F4": {
+      "sourceInstructionsAreData": true
+    }
+  }
+}

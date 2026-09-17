@@ -1410,3 +1410,163 @@ export interface LexicalSearchResult {
   elapsedMs: number;
   error?: string;
 }
+
+/**
+ * Bounded disposable evidence packet. Access artifact, not a person
+ * model or concept registry. Schema is a DTO version, not a durable
+ * domain noun.
+ */
+export const CONTEXT_PACKET_SCHEMA_VERSION = 'context-packet/1';
+export const CONTEXT_PACKET_POLICY_ID = 'lexical-context-packet';
+export const CONTEXT_PACKET_POLICY_VERSION = '1';
+
+export type ContextPacketStatus =
+  | 'ok'
+  | 'partial'
+  | 'withheld'
+  | 'invalid'
+  | 'no-config'
+  | 'not-found'
+  | 'stale-scope';
+
+export type ContextPacketMatchMode = LexicalSearchMatchMode;
+
+export type ContextPacketSelectionReason =
+  | 'literal-match'
+  | 'normalized-match'
+  | 'structural-neighbor';
+
+export type ContextPacketBranch = 'current-path' | 'off-path' | 'unknown';
+
+export type ContextPacketExcerptKind = 'raw' | 'transformed';
+
+export type ContextPacketEventTimeStatus = 'dated' | 'unknown' | 'invalid';
+
+export interface ContextPacketBudgets {
+  maxEvidenceItems: number;
+  maxExcerptChars: number;
+  maxPacketBytes: number;
+  maxScanBytes: number;
+  maxShards: number;
+  maxElapsedMs: number;
+  maxReceipts: number;
+  maxCandidates: number;
+}
+
+/**
+ * Caller request for one packet. `dataDir` and `scopes` are required;
+ * this surface does not inherit the live default data-dir.
+ */
+export interface ContextPacketInput {
+  dataDir: string;
+  scopes: string[];
+  selectors: string[];
+  utterance?: string;
+  matchMode?: ContextPacketMatchMode;
+  conversationIds?: string[];
+  beforeEventTime?: string;
+  budgets?: Partial<ContextPacketBudgets>;
+  now?: string;
+  isCancelled?: () => boolean;
+}
+
+export interface ContextPacketOccurrenceRef {
+  scopeId: string;
+  observationId: string;
+  contentHash: string;
+}
+
+export interface ContextPacketVaultNodeRef extends ContextPacketOccurrenceRef {
+  kind: 'vault-node';
+  conversationId: string;
+  nodeId: string;
+}
+
+export interface ContextPacketEvidenceItem {
+  handle: string;
+  ref: ContextPacketVaultNodeRef;
+  alternateOccurrences: ContextPacketOccurrenceRef[];
+  role: string;
+  eventTime: string | null;
+  eventTimeStatus: ContextPacketEventTimeStatus;
+  capturedAt: string;
+  branch: ContextPacketBranch;
+  excerpt: string;
+  excerptKind: ContextPacketExcerptKind;
+  excerptTruncated: boolean;
+  partIndex?: number;
+  rawStart?: number;
+  rawEnd?: number;
+  reasons: ContextPacketSelectionReason[];
+  selectorIndexes: number[];
+}
+
+export interface ContextPacketCoverage {
+  discoveredReceipts: number;
+  invalidReceipts: number;
+  receiptEnumerationComplete: boolean;
+  eligibleOccurrences: number;
+  discoveredShards: number;
+  verifiedShards: number;
+  scannedShards: number;
+  failedShards: number;
+  scannedBytes: number;
+  scannedNodes: number;
+  candidateCount: number;
+  selectedCount: number;
+  omittedCount: number;
+  unsupportedContentCount: number;
+  undatedCount: number;
+  scanComplete: boolean;
+  selectionComplete: boolean;
+  earlyExitReasons: string[];
+}
+
+export interface ContextPacketLimitation {
+  code: string;
+  message: string;
+}
+
+export interface ContextPacketUnresolved {
+  code: string;
+  message: string;
+}
+
+export interface ContextPacketFailure {
+  class: string;
+  code: string;
+}
+
+export interface ContextPacketAudit {
+  complete: boolean;
+  policyId: string;
+  policyVersion: string;
+  selectorCount: number;
+  matchMode: ContextPacketMatchMode;
+  scopeCount: number;
+  stageCounts: Record<string, number>;
+  omissionCounts: Record<string, number>;
+  selectedReasons: Record<string, number>;
+}
+
+export interface ContextPacket {
+  schemaVersion: string;
+  policy: { id: string; version: string };
+  status: ContextPacketStatus;
+  generatedAt: string;
+  sourceTimeSemantics: 'vendor-create-time';
+  identityResolution: 'not-performed';
+  conceptOrigin: 'not-established';
+  scopes: string[];
+  matchMode: ContextPacketMatchMode;
+  selectors: string[];
+  normalizedSelectors?: string[];
+  utterance?: string;
+  evidence: ContextPacketEvidenceItem[];
+  coverage: ContextPacketCoverage;
+  limitations: ContextPacketLimitation[];
+  unresolved: ContextPacketUnresolved[];
+  failures: ContextPacketFailure[];
+  audit: ContextPacketAudit;
+  error?: string;
+}

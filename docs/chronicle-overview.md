@@ -77,6 +77,11 @@ and should eventually support multiple downstream consumers:
 
 **Chronicle is the source of truth. Everything else consumes Chronicle.**
 
+V1 access over already-authorized vault evidence includes
+`chronicle search` (hit list) and `chronicle context-packet` (bounded
+packet with explicit limitations). Neither resolves identity or
+extends frozen `Activity`.
+
 ## Future repositories
 
 Potential future repositories (not to be created until Chronicle proves the core concepts):

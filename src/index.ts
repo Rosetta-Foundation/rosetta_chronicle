@@ -21,14 +21,8 @@ import {
   ITransformationHandler,
   TransformationHandler,
 } from './transformation.handler';
-import {
-  IProvenanceHandler,
-  ProvenanceHandler,
-} from './provenance.handler';
-import {
-  IInterpretHandler,
-  InterpretHandler,
-} from './interpret.handler';
+import { IProvenanceHandler, ProvenanceHandler } from './provenance.handler';
+import { IInterpretHandler, InterpretHandler } from './interpret.handler';
 import { IEvaluateHandler, EvaluateHandler } from './evaluate.handler';
 import {
   ICurrentUnderstandingHandler,
@@ -173,16 +167,18 @@ import {
   IObservationReceiptRepository,
   ObservationReceiptRepository,
 } from './repositories/observation-receipt.repository';
-import {
-  IObserveService,
-  ObserveService,
-} from './services/observe.service';
-import {
-  IObserveHandler,
-  ObserveHandler,
-} from './observe.handler';
+import { IObserveService, ObserveService } from './services/observe.service';
+import { IObserveHandler, ObserveHandler } from './observe.handler';
 import { ISearchService, SearchService } from './services/search.service';
 import { ISearchHandler, SearchHandler } from './search.handler';
+import {
+  IContextPacketService,
+  ContextPacketService,
+} from './services/context-packet.service';
+import {
+  IContextPacketHandler,
+  ContextPacketHandler,
+} from './context-packet.handler';
 
 /**
  * Composition root. Wires the InversifyJS container and exposes a factory for
@@ -315,6 +311,9 @@ export const buildContainer = (): Container => {
   container
     .bind<ISearchService>(CHRONICLE_TOKENS.SearchService)
     .to(SearchService);
+  container
+    .bind<IContextPacketService>(CHRONICLE_TOKENS.ContextPacketService)
+    .to(ContextPacketService);
 
   // Handlers
   container
@@ -362,6 +361,9 @@ export const buildContainer = (): Container => {
   container
     .bind<ISearchHandler>(CHRONICLE_TOKENS.SearchHandler)
     .to(SearchHandler);
+  container
+    .bind<IContextPacketHandler>(CHRONICLE_TOKENS.ContextPacketHandler)
+    .to(ContextPacketHandler);
 
   return container;
 };
@@ -454,4 +456,11 @@ export const getObserveHandler = (): IObserveHandler => {
 /** Resolve the lexical conversation-search handler from a fresh container. */
 export const getSearchHandler = (): ISearchHandler => {
   return buildContainer().get<ISearchHandler>(CHRONICLE_TOKENS.SearchHandler);
+};
+
+/** Resolve the context-packet handler from a fresh container. */
+export const getContextPacketHandler = (): IContextPacketHandler => {
+  return buildContainer().get<IContextPacketHandler>(
+    CHRONICLE_TOKENS.ContextPacketHandler,
+  );
 };

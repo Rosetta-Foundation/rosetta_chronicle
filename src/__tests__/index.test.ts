@@ -13,6 +13,7 @@ import {
   getChatGptConversationLocateHandler,
   getObserveHandler,
   getSearchHandler,
+  getContextPacketHandler,
 } from '../index';
 import { CHRONICLE_TOKENS } from '../tokens';
 
@@ -131,6 +132,14 @@ describe('getObserveHandler', () => {
 describe('getSearchHandler', () => {
   it('resolves the search handler with its dependency graph', () => {
     const handler = getSearchHandler();
+    expect(handler).toBeDefined();
+    expect(typeof handler.handle).toBe('function');
+  });
+});
+
+describe('getContextPacketHandler', () => {
+  it('resolves the context-packet handler with its dependency graph', () => {
+    const handler = getContextPacketHandler();
     expect(handler).toBeDefined();
     expect(typeof handler.handle).toBe('function');
   });
