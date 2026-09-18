@@ -3,6 +3,7 @@ import {
   mkdirSync,
   readdirSync,
   readFileSync,
+  statSync,
   unlinkSync,
   writeFileSync,
 } from 'fs';
@@ -16,6 +17,14 @@ import { injectable } from 'inversify';
  * Objects are canonical evidence. Identity is SHA-256 of exact bytes.
  * Copy-if-new; never interprets content. Not a Git repository.
  */
+export type VaultGetVerified =
+  | { ok: true; bytes: Buffer; byteLength: number }
+  | {
+      ok: false;
+      reason: 'invalid-hash' | 'missing' | 'oversize' | 'hash-mismatch';
+      byteLength?: number;
+    };
+
 export interface ISourceVaultRepository {
   objectPath(vaultRoot: string, contentHash: string): string;
   putIfNew(
@@ -24,6 +33,15 @@ export interface ISourceVaultRepository {
     bytes: Buffer,
   ): Promise<{ existed: boolean }>;
   get(vaultRoot: string, contentHash: string): Promise<Buffer | null>;
+  /**
+   * Bounded verified read. Stats size before allocating the body,
+   * then recomputes SHA-256. A matching pathname is not proof.
+   */
+  getVerified(
+    vaultRoot: string,
+    contentHash: string,
+    maxBytes: number,
+  ): Promise<VaultGetVerified>;
   unlink(vaultRoot: string, contentHash: string): Promise<void>;
   objectCount(vaultRoot: string): Promise<number>;
 }
@@ -71,6 +89,26 @@ export class SourceVaultRepository implements ISourceVaultRepository {
     const dest = this.objectPath(vaultRoot, contentHash);
     if (!existsSync(dest)) return null;
     return readFileSync(dest);
+  }
+
+  /** @inheritDoc */
+  async getVerified(
+    vaultRoot: string,
+    contentHash: string,
+    maxBytes: number,
+  ): Promise<VaultGetVerified> {
+    if (!HASH.test(contentHash)) return { ok: false, reason: 'invalid-hash' };
+    const dest = this.objectPath(vaultRoot, contentHash);
+    if (!existsSync(dest)) return { ok: false, reason: 'missing' };
+    const size = statSync(dest).size;
+    if (size > maxBytes) {
+      return { ok: false, reason: 'oversize', byteLength: size };
+    }
+    const bytes = readFileSync(dest);
+    if (sha256Bytes(bytes) !== contentHash) {
+      return { ok: false, reason: 'hash-mismatch', byteLength: bytes.length };
+    }
+    return { ok: true, bytes, byteLength: bytes.length };
   }
 
   /** @inheritDoc */

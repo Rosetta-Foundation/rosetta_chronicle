@@ -2,9 +2,11 @@
 
 > Transforms engineering activity into durable organizational knowledge.
 
-Chronicle is the **memory engine** of the Rosetta platform. It continuously captures engineering
-context — Git, GitHub, Jira, AI conversations, notes, and more — and synthesizes it into structured
-knowledge that is equally valuable to humans and AI.
+Chronicle is the **memory engine** of the Rosetta platform. The v0.1 Daily
+Chronicle (`Activity` + `backfill`) is **frozen historical record**. New work
+follows the Build Charter: allowlisted vault observe, source graphs, and
+read-only access paths over already-authorized evidence. It does not extend
+`Activity`.
 
 Chronicle is the source of truth. Everything else (Wayfinder, performance reviews, documentation
 generation, knowledge graphs) consumes Chronicle. It is deliberately **not** coupled to any single
@@ -66,7 +68,9 @@ the read-only current-understanding view, the read-only
 ChatGPT conversation-level view and locate-by-id commands,
 `chronicle start` (the V1 turn-on alias for `watch`), and
 `chronicle search` (read-only lexical scan of vaulted ChatGPT
-shards; no index)
+shards; no index), and `chronicle context-packet` (bounded
+read-only evidence packet; no identity resolution; see
+[`docs/design/context-packet.md`](docs/design/context-packet.md))
 are documented under [`docs/design/`](docs/design/).
 The memory-publication invariant for machine output lives in
 [`docs/design/interpretation-policy.md`](docs/design/interpretation-policy.md).

@@ -1,7 +1,12 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { injectable } from 'inversify';
-import { ObserveConfig } from '../types';
+import { ObserveConfig, ObserveScope } from '../types';
+import { isRecord } from '../utils/chatgpt-export.utils';
+
+export type ObserveConfigReadResolved =
+  | { ok: true; config: ObserveConfig }
+  | { ok: false; reason: 'missing' | 'unreadable' | 'invalid-shape' };
 
 /**
  * Reads and writes the V1 observe config beside the private vault.
@@ -11,8 +16,36 @@ import { ObserveConfig } from '../types';
 export interface IObserveConfigRepository {
   pathFor(dataDir: string): string;
   read(dataDir: string): Promise<ObserveConfig | null>;
+  /**
+   * Diagnostic read. Successful JSON parse is not enough — the
+   * document must be a v1 config with shaped scopes. Legacy `read`
+   * is unchanged.
+   */
+  readResolved(dataDir: string): Promise<ObserveConfigReadResolved>;
   write(dataDir: string, config: ObserveConfig): Promise<void>;
 }
+
+const isScope = (value: unknown): value is ObserveScope => {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value['id'] === 'string' &&
+    value['id'].length > 0 &&
+    (value['kind'] === 'file' || value['kind'] === 'directory') &&
+    typeof value['path'] === 'string' &&
+    typeof value['stopped'] === 'boolean' &&
+    typeof value['forgotten'] === 'boolean'
+  );
+};
+
+export const isObserveConfigShape = (
+  value: unknown,
+): value is ObserveConfig => {
+  if (!isRecord(value)) return false;
+  if (value['version'] !== 1) return false;
+  if (typeof value['stopped'] !== 'boolean') return false;
+  if (!Array.isArray(value['scopes'])) return false;
+  return value['scopes'].every(isScope);
+};
 
 /**
  * `config.json` in the operator-chosen data directory.
@@ -32,6 +65,21 @@ export class ObserveConfigRepository implements IObserveConfigRepository {
       return JSON.parse(readFileSync(p, 'utf8')) as ObserveConfig;
     } catch {
       return null;
+    }
+  }
+
+  /** @inheritDoc */
+  async readResolved(dataDir: string): Promise<ObserveConfigReadResolved> {
+    const p = this.pathFor(dataDir);
+    if (!existsSync(p)) return { ok: false, reason: 'missing' };
+    try {
+      const parsed: unknown = JSON.parse(readFileSync(p, 'utf8'));
+      if (!isObserveConfigShape(parsed)) {
+        return { ok: false, reason: 'invalid-shape' };
+      }
+      return { ok: true, config: parsed };
+    } catch {
+      return { ok: false, reason: 'unreadable' };
     }
   }
 

@@ -18,14 +18,13 @@ export const CHRONICLE_TOKENS = {
   InterpretHandler: Symbol.for('InterpretHandler'),
   EvaluateHandler: Symbol.for('EvaluateHandler'),
   CurrentUnderstandingHandler: Symbol.for('CurrentUnderstandingHandler'),
-  ChatGptConversationViewHandler: Symbol.for(
-    'ChatGptConversationViewHandler',
-  ),
+  ChatGptConversationViewHandler: Symbol.for('ChatGptConversationViewHandler'),
   ChatGptConversationLocateHandler: Symbol.for(
     'ChatGptConversationLocateHandler',
   ),
   ObserveHandler: Symbol.for('ObserveHandler'),
   SearchHandler: Symbol.for('SearchHandler'),
+  ContextPacketHandler: Symbol.for('ContextPacketHandler'),
 
   // Services
   ChronicleService: Symbol.for('ChronicleService'),
@@ -37,14 +36,13 @@ export const CHRONICLE_TOKENS = {
   InterpretationService: Symbol.for('InterpretationService'),
   EvaluationService: Symbol.for('EvaluationService'),
   CurrentUnderstandingService: Symbol.for('CurrentUnderstandingService'),
-  ChatGptConversationViewService: Symbol.for(
-    'ChatGptConversationViewService',
-  ),
+  ChatGptConversationViewService: Symbol.for('ChatGptConversationViewService'),
   ChatGptConversationLocateService: Symbol.for(
     'ChatGptConversationLocateService',
   ),
   ObserveService: Symbol.for('ObserveService'),
   SearchService: Symbol.for('SearchService'),
+  ContextPacketService: Symbol.for('ContextPacketService'),
 
   // Repositories (one per source)
   GitRepository: Symbol.for('GitRepository'),

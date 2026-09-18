@@ -73,6 +73,10 @@ FTS, query expansion, embeddings, MCP, provider egress, a durable
 index, word-boundary ranking, and searching non-ChatGPT vault objects.
 `--match normalized` is not those things.
 
+A stricter cross-conversation handoff lives in
+[`context-packet.md`](context-packet.md). Search remains the hit-list
+specimen; the packet does not change raw/normalized search behavior.
+
 ## CLI
 
 ```text

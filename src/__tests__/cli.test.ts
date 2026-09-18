@@ -52,6 +52,8 @@ describe('chronicle CLI', () => {
     expect(result.stdout).toContain('chatgpt-conversation-view');
     expect(result.stdout).toContain('chatgpt-conversation-locate');
     expect(result.stdout).toContain('chronicle search');
+    expect(result.stdout).toContain('chronicle context-packet');
+    expect(result.stdout).toContain('--request');
     expect(result.stdout).toContain('--role');
     expect(result.stdout).toContain('--match');
     expect(result.stdout).toContain('chronicle start');
@@ -134,10 +136,7 @@ describe('chronicle CLI', () => {
 
   it('import-chatgpt --dry-run does not write a graph', () => {
     const repo = mkdtempSync(join(tmpdir(), 'cli-import-dry-'));
-    const fixture = join(
-      __dirname,
-      'fixtures/chatgpt-export/complete-export',
-    );
+    const fixture = join(__dirname, 'fixtures/chatgpt-export/complete-export');
     try {
       const result = spawnSync(
         process.execPath,
@@ -164,10 +163,7 @@ describe('chronicle CLI', () => {
 
   it('import-chatgpt writes a graph without leaking source text', () => {
     const repo = mkdtempSync(join(tmpdir(), 'cli-import-'));
-    const fixture = join(
-      __dirname,
-      'fixtures/chatgpt-export/complete-export',
-    );
+    const fixture = join(__dirname, 'fixtures/chatgpt-export/complete-export');
     try {
       const result = spawnSync(
         process.execPath,
@@ -323,9 +319,9 @@ describe('chronicle CLI', () => {
       expect(graphWalk.status).toBe(0);
       const graphResult = JSON.parse(graphWalk.stdout);
       expect(graphResult.status).toBe('partial');
-      expect(graphResult.failures.map((row: { code: string }) => row.code)).toContain(
-        'source-graph-missing',
-      );
+      expect(
+        graphResult.failures.map((row: { code: string }) => row.code),
+      ).toContain('source-graph-missing');
       rmSync(graphs, { recursive: true, force: true });
     } finally {
       rmSync(out, { recursive: true, force: true });
@@ -393,10 +389,7 @@ describe('chronicle CLI', () => {
     const execs = mkdtempSync(join(tmpdir(), 'cli-e4-exec-'));
     const defs = mkdtempSync(join(tmpdir(), 'cli-e4-def-'));
     const occs = mkdtempSync(join(tmpdir(), 'cli-e4-occ-'));
-    const fixture = join(
-      __dirname,
-      'fixtures/chatgpt-export/complete-export',
-    );
+    const fixture = join(__dirname, 'fixtures/chatgpt-export/complete-export');
     try {
       const imported = spawnSync(
         process.execPath,
@@ -594,6 +587,134 @@ describe('chronicle CLI', () => {
     }
   });
 
+  it('context-packet requires --request and does not inherit the live data-dir', () => {
+    const missing = spawnSync(process.execPath, [CLI, 'context-packet'], {
+      encoding: 'utf-8',
+    });
+    expect(missing.status).toBe(1);
+    expect(missing.stderr).toContain('--request');
+    const tmp = mkdtempSync(join(tmpdir(), 'cli-packet-req-'));
+    try {
+      const req = join(tmp, 'req.json');
+      writeFileSync(req, '{not json');
+      const badJson = spawnSync(
+        process.execPath,
+        [CLI, 'context-packet', '--request', req],
+        { encoding: 'utf-8' },
+      );
+      expect(badJson.status).toBe(1);
+      expect(badJson.stderr).toContain('readable JSON');
+      writeFileSync(req, JSON.stringify({ scopes: ['s'], selectors: ['x'] }));
+      const noDir = spawnSync(
+        process.execPath,
+        [CLI, 'context-packet', '--request', req],
+        {
+          encoding: 'utf-8',
+          env: { ...process.env, CHRONICLE_DATA_DIR: undefined },
+        },
+      );
+      expect(noDir.status).toBe(1);
+      expect(noDir.stderr).toContain('missing-data-dir');
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it('context-packet returns earlier evidence from a throwaway vault', () => {
+    const dataDir = mkdtempSync(join(tmpdir(), 'cli-packet-'));
+    const source = join(dataDir, 'src');
+    mkdirSync(source);
+    writeFileSync(
+      join(source, 'conversations-000.json'),
+      `${JSON.stringify([
+        {
+          conversation_id: 'conv-cli-packet',
+          current_node: 'n1',
+          mapping: {
+            n1: {
+              id: 'n1',
+              parent: null,
+              message: {
+                author: { role: 'user' },
+                create_time: 1704196800,
+                content: {
+                  content_type: 'text',
+                  parts: ['I call this practice the winding path.'],
+                },
+              },
+            },
+          },
+        },
+      ])}\n`,
+    );
+    try {
+      expect(
+        spawnSync(
+          process.execPath,
+          [
+            CLI,
+            'observe-init',
+            '--data-dir',
+            dataDir,
+            '--scope',
+            'live',
+            '--path',
+            source,
+          ],
+          { encoding: 'utf-8' },
+        ).status,
+      ).toBe(0);
+      expect(
+        spawnSync(
+          process.execPath,
+          [CLI, 'observe', '--data-dir', dataDir, '--scope', 'live'],
+          { encoding: 'utf-8' },
+        ).status,
+      ).toBe(0);
+      const req = join(dataDir, 'request.json');
+      writeFileSync(
+        req,
+        JSON.stringify({
+          dataDir,
+          scopes: ['live'],
+          selectors: ['winding path'],
+        }),
+      );
+      const result = spawnSync(
+        process.execPath,
+        [CLI, 'context-packet', '--request', req],
+        { encoding: 'utf-8' },
+      );
+      expect(result.status).toBe(0);
+      const body = JSON.parse(result.stdout) as {
+        status: string;
+        identityResolution: string;
+        evidence: { excerpt: string; ref: { conversationId: string } }[];
+      };
+      expect(body.status).toBe('ok');
+      expect(body.identityResolution).toBe('not-performed');
+      expect(body.evidence[0]?.excerpt).toContain('winding path');
+      expect(body.evidence[0]?.ref.conversationId).toBe('conv-cli-packet');
+      writeFileSync(
+        req,
+        JSON.stringify({
+          dataDir,
+          scopes: ['missing'],
+          selectors: ['winding path'],
+        }),
+      );
+      const unknown = spawnSync(
+        process.execPath,
+        [CLI, 'context-packet', '--request', req],
+        { encoding: 'utf-8' },
+      );
+      expect(unknown.status).toBe(1);
+      expect(JSON.parse(unknown.stdout).status).toBe('not-found');
+    } finally {
+      rmSync(dataDir, { recursive: true, force: true });
+    }
+  });
+
   it('chatgpt-conversation-locate exits 1 without --conversation-id', () => {
     const result = spawnSync(
       process.execPath,
@@ -607,7 +728,14 @@ describe('chronicle CLI', () => {
   it('current-understanding exits 1 without a perspective', () => {
     const result = spawnSync(
       process.execPath,
-      [CLI, 'current-understanding', '--output', '/tmp', '--evaluations', '/tmp'],
+      [
+        CLI,
+        'current-understanding',
+        '--output',
+        '/tmp',
+        '--evaluations',
+        '/tmp',
+      ],
       { encoding: 'utf-8' },
     );
     expect(result.status).toBe(1);
@@ -685,7 +813,14 @@ describe('chronicle CLI', () => {
   it('evaluate-derived rejects a non-human evaluator', () => {
     const result = spawnSync(
       process.execPath,
-      [CLI, 'evaluate-derived', '--evaluator-type', 'agent', '--derived', 'a'.repeat(64)],
+      [
+        CLI,
+        'evaluate-derived',
+        '--evaluator-type',
+        'agent',
+        '--derived',
+        'a'.repeat(64),
+      ],
       { encoding: 'utf-8' },
     );
     expect(result.status).toBe(1);
